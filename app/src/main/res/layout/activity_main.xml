@@ -10,8 +10,9 @@
         android:id="@+id/tv"
         android:layout_width="314dp"
         android:layout_height="458dp"
-        android:textSize="10sp"
+        android:scrollbars="vertical"
         android:scrollHorizontally="true"
+        android:textSize="10sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintHorizontal_bias="0.494"
         app:layout_constraintLeft_toLeftOf="parent"
@@ -30,7 +31,8 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         tools:layout_editor_absoluteY="32dp"
-        tools:ignore="MissingConstraints" />
+        tools:ignore="MissingConstraints"
+        android:text="IMG_5326.jpg"/>
 
     <Button
         android:id="@+id/button_ocr"
