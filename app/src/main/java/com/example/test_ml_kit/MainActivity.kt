@@ -15,27 +15,27 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.common.InputImage.fromBitmap
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
+import com.googlecode.tesseract.android.TessBaseAPI
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 import java.io.IOException
 import java.util.*
-import kotlin.math.cos
-import kotlin.math.round
-import kotlin.math.sin
+import kotlin.math.sqrt
 
 
 //tutorial https://developers.google.com/ml-kit/vision/text-recognition/android
 
 class MainActivity : AppCompatActivity() {
 
+    private val USE_ML_KIT_FLAG = true
+
 //    private val angles = intArrayOf(0, 90, 180, 270)
     private val angles = intArrayOf(0, 270)
     // <image rotation angle, recognized text for the current angle>
     private var blocks_angles: Map<Int, MutableList<Text.TextBlock>> = mapOf<Int, MutableList<Text.TextBlock>>()
-//    private var
+    private var image: InputImage? = null
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private fun readImage(): InputImage? {
         var file: File = File("/sdcard/Download", editText.text.toString())
         var uri: Uri = Uri.fromFile(file)
-        var image: InputImage? = null
         try {
             image = InputImage.fromFilePath(applicationContext, uri)
         } catch (e: IOException) {
@@ -63,28 +62,39 @@ class MainActivity : AppCompatActivity() {
         return image
     }
 
+    private fun getModelPath(): String {
+        var file: File = File("/sdcard/Download", "eng.traineddata")
+        var uri: Uri = Uri.fromFile(file)
+
+        return uri.path.orEmpty()
+    }
+
     //------------------------------------------
     // OCR and visualization
     //------------------------------------------
 
     private fun ocrButtonClickedHandler() {
-        var image: InputImage? = readImage()
+        image = readImage()
         imageView.setImageBitmap(image?.bitmapInternal)
 
-        if (image != null) {
+        if (null != image) {
+            if (USE_ML_KIT_FLAG) {
+                // TODO: 19/10/2020 (Anastasia) attention! there might be a conflict
+                // when TextRecognition is called for a new image orientation,
+                // but the results of a previous angle are not yet received
+                for (angle in angles) {
+                    recognizeImage(image!!, angle)
+                }
 
-            // TODO: 19/10/2020 (Anastasia) attention! there might be a conflict
-            // when TextRecognition is called for a new image orientation,
-            // but the results of a previous angle are not yet received
-            for (angle in angles) {
-                recognizeImage(image, angle)
+                // TODO: 19/10/2020 (Anastasia) attention! the function displayRecognitionResult
+                // should be called after the TextRecognition is finished for all angles
+                (Handler()).postDelayed(
+                    this::displayRecognitionResult,
+                    (sqrt((image!!.width * image!!.height).toDouble()) * angles.size).toLong()
+                )
+            } else {
+                tv.text = image!!.bitmapInternal?.let { extractText(it) }
             }
-            // TODO: 19/10/2020 (Anastasia) attention! the function displayRecognitionResult
-            // should be called after the TextRecognition is finished for all angles
-            (Handler()).postDelayed(
-                this::displayRecognitionResult,
-                (1000 * angles.size).toLong()
-            )
         }
     }
 
@@ -106,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2F
         paint.isAntiAlias = true
+        paint.textSize = 20F;
 
         val colors = listOf<Int>(Color.RED, Color.BLUE, Color.MAGENTA, Color.CYAN)
         var angle: Int = 0
@@ -117,8 +128,17 @@ class MainActivity : AppCompatActivity() {
             angle = angles[i]
             blocks = blocks_angles[angle]
             if (blocks != null) {
-                for (block in blocks) {
+                for (i in blocks.indices) {
+                    val block = blocks[i]
                     block?.boundingBox?.let {canvas?.drawRect(it, paint) }
+                    block?.boundingBox?.left?.toFloat()?.let {
+                        if (canvas != null) {
+                            canvas.drawText(
+                                "$i",
+                                it, block?.boundingBox!!.top.toFloat(), paint
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -143,14 +163,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun recognizeImage(image: InputImage, angle: Int) {
-        val image = image?.bitmapInternal?.let { fromBitmap(it, angle) }
-        val recognizer = TextRecognition.getClient()
 
-        val result = image?.let {
-            recognizer.process(it)
+        if (null != image) {
+            val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
+            val recognizer = TextRecognition.getClient()
+            val result = recognizer.process(image_rotated)
                 .addOnSuccessListener { visionText ->
                     var blocks = visionText.textBlocks
-                    blocks = adjustCoordinatesByOriginalAngle(blocks, angle)
+                    blocks = adjustCoordinatesByOriginalAngle(
+                        blocks, angle,
+                        image_rotated.width, image_rotated.height
+                    )
 
                     blocks_angles += Pair(angle, blocks)
                 }
@@ -160,14 +183,35 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun adjustCoordinatesByOriginalAngle(blocks: MutableList<Text.TextBlock>, angle: Int):
+
+    @Throws(java.lang.Exception::class)
+    private fun extractText(bitmap: Bitmap): String? {
+        val tessBaseApi = TessBaseAPI()
+        tessBaseApi.init(getModelPath(), "eng")
+        tessBaseApi.setImage(bitmap)
+        val extractedText = tessBaseApi.utF8Text
+        tessBaseApi.end()
+        return extractedText
+    }
+
+
+
+
+    private fun adjustCoordinatesByOriginalAngle(
+        blocks: MutableList<Text.TextBlock>, angle: Int, width: Int, height: Int
+    ):
             MutableList<Text.TextBlock> {
 
         if (0 != angle) {
             for (block in blocks) {
                 if (null != block.cornerPoints) {
                     for (i in 0 until (block.cornerPoints!!.size)) {
-                        block.cornerPoints!![i] = rotatePoint(block.cornerPoints!![i], angle)
+                        block.cornerPoints!![i] = rotatePoint(
+                            block.cornerPoints!![i],
+                            angle,
+                            width,
+                            height
+                        )
                     }
                 }
 
@@ -186,7 +230,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getRectangleFromCorners(cornerPoints: Array<Point>?): Rect {
-        var rect = Rect(0,0,0,0)
+        var rect = Rect(0, 0, 0, 0)
 
         if (null != cornerPoints) {
             val left = minOf(cornerPoints[0].x, cornerPoints[1].x, cornerPoints[2].x)
@@ -203,32 +247,38 @@ class MainActivity : AppCompatActivity() {
         return rect
     }
 
-    private fun rotateXCoordinate(x: Int, y: Int, angle: Int): Int {
+    private fun rotateXCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
 
-        val w = imageView.drawable.toBitmap().width.toDouble()
-        val h = imageView.drawable.toBitmap().height.toDouble()
-        val center_x = w / 2
-        val center_y = h / 2
-        return round((x - center_x) * cos(angle * Math.PI / 180) -
-                (h - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
+//        val angle = 360 - angle
+//        val center_x = width / 2
+//        val center_y = height / 2
+//        return round((x - center_x) * cos(angle * Math.PI / 180) -
+//                (height - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
+
+            return width - y
+
     }
 
-    private fun rotateYCoordinate(x: Int, y: Int, angle: Int): Int {
+    private fun rotateYCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
         // In an image, downwards is positive Y and rightwards is positive X
         // https://stackoverflow.com/questions/6428192/get-new-x-y-coordinates-of-a-point-in-a-rotated-image
 
-        val w = imageView.drawable.toBitmap().width.toDouble()
-        val h = imageView.drawable.toBitmap().height.toDouble()
-        val center_x = w / 2
-        val center_y = h / 2
-        return round(- (x - center_x) * sin(angle * Math.PI / 180) -
-                (h - y - center_y) * cos(angle * Math.PI / 180) + (h - center_y)).toInt()
+//        val angle = 360 - angle
+//        val center_x = width / 2
+//        val center_y = height / 2
+//        return round(
+//            -(x - center_x) * sin(angle * Math.PI / 180) -
+//                    (height - y - center_y) * cos(angle * Math.PI / 180) + (height - center_y)
+//        ).toInt()
+
+        return x
     }
 
-    private fun rotatePoint(point: Point, angle: Int): Point {
+    private fun rotatePoint(point: Point, angle: Int, width: Int, height: Int): Point {
         return Point(
-            rotateXCoordinate(point.x,point.y,angle),
-            rotateYCoordinate(point.x,point.y,angle))
+            rotateXCoordinate(point.x, point.y, angle, width, height),
+            rotateYCoordinate(point.x, point.y, angle, width, height)
+        )
     }
 
 
@@ -236,10 +286,10 @@ class MainActivity : AppCompatActivity() {
         blocks: MutableList<Text.TextBlock>, use_filter_flag: Boolean = false
     ): String {
 
-        var text_to_display = "Recognized: \n"
+        var text_to_display = "\n"
         for (i in 0 until blocks.size) {
             var block = blocks[i]
-            text_to_display += "Block $i (" +
+            text_to_display += "BLOCK $i (" +
                     "${block.cornerPoints?.get(0)?.x}, " +
                     "${block.cornerPoints?.get(0)?.y}):\n"
             text_to_display += getFilteredText(block, use_filter_flag) + "\n"
