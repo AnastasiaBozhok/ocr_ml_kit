@@ -34,7 +34,7 @@ class RecognitionResultAdapter {
             val line_length_threshold = 2;
 
             if (!use_filter_flag || this.text_lines.isEmpty())
-                return this.block_text
+                return this.block_text + "\n"
 
             var filteredText = ""
             for (line in this.text_lines) {

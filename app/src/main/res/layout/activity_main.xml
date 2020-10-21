@@ -22,21 +22,45 @@
         android:layout_margin="16pt"
         android:minWidth="300dp"/>
 
-    <Button
-        android:id="@+id/button_ocr"
+
+    <LinearLayout
+        android:id="@+id/buttonsGroup"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="OCR"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/editText" />
+        app:layout_constraintTop_toBottomOf="@+id/editText"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/button_ocr_mlkit"
+            android:textAllCaps="false"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OCR with Ml-Kit"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="parent" />
+
+        <Button
+            android:id="@+id/button_ocr_tesseract"
+            android:textAllCaps="false"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="OCR with Tesseract"
+            app:layout_constraintLeft_toRightOf="@id/button_ocr_mlkit"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="parent" />
+
+    </LinearLayout>
 
     <ImageView
         android:id="@+id/imageView"
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:layout_marginTop="16dp"
-        app:layout_constraintTop_toBottomOf="@+id/button_ocr" />
+        app:layout_constraintTop_toBottomOf="@+id/buttonsGroup" />
 
     <TextView
         android:id="@+id/tv"
