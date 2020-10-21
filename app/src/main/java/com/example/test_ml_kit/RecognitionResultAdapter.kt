@@ -1,6 +1,6 @@
 package com.example.test_ml_kit
 
-import android.graphics.Rect
+import android.graphics.*
 import android.util.Log
 import com.google.mlkit.vision.text.Text
 import com.googlecode.tesseract.android.TessBaseAPI
@@ -97,5 +97,47 @@ class RecognitionResultAdapter {
         }
         return text_to_display
     }
+
+    fun getAnnotatedBitmap(workingBitmap: Bitmap): Bitmap? {
+
+        if (null != this) {
+            val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
+
+            //Draw the image bitmap into the cavas
+            val canvas = mutableBitmap?.let { Canvas(it) }
+
+            this.drawBoxesOnCanvas(canvas, Color.RED)
+            return mutableBitmap
+        }
+
+        return null
+    }
+
+    fun drawBoxesOnCanvas(
+        canvas: Canvas?, color: Int) {
+
+        // Line (stroke) options
+        var paint = Paint()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2F
+        paint.isAntiAlias = true
+        paint.textSize = 20F;
+        paint.color = color
+
+        if (null != canvas && null != this) {
+            for (i in this.text_blocks.indices) {
+                val block = this.text_blocks[i]
+                if (block?.block_bounding_box != null) {
+                    canvas.drawRect(block.block_bounding_box, paint)
+                    canvas.drawText(
+                        "$i",
+                        block.block_bounding_box!!.left.toFloat(),
+                        block.block_bounding_box!!.top.toFloat(), paint
+                    )
+                }
+            }
+        }
+    }
+
 
 }

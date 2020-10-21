@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
 
 
     //------------------------------------------
-    // OCR and visualization
+    // Ml-kit OCR
     //------------------------------------------
 
     private fun ocrMlkitButtonClickedHandler() {
@@ -100,24 +100,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun ocrTesseractButtonClickedHandler() {
-        image = readImage()
-
-        if (null != image && null != image!!.bitmapInternal) {
-            imageView.setImageBitmap(image!!.bitmapInternal)
-
-            val result = doOcrTesseract(image!!.bitmapInternal!!)
-//                tv.text = result
-            tv.text = tess_result?.filteredBlockText()
-            imageView.setImageBitmap(tess_result?.let { getAnnotatedBitmap(it) })
-        }
-    }
-
-    private fun doOcrTesseract(image: Bitmap): String {
-//        prepareTesseract()
-        return startOcrTesseract(image)
-    }
-
     private fun recognizeImageMlKit(image: InputImage, angle: Int) {
 
         if (null != image) {
@@ -139,7 +121,45 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun extractText(bitmap: Bitmap): String? {
+    //------------------------------------------
+    // Tesseract OCR
+    //------------------------------------------
+
+    private fun ocrTesseractButtonClickedHandler() {
+        image = readImage()
+
+        if (null != image && null != image!!.bitmapInternal) {
+            imageView.setImageBitmap(image!!.bitmapInternal)
+
+            val result = doOcrTesseract(image!!.bitmapInternal!!)
+//                tv.text = result
+            tv.text = tess_result?.filteredBlockText()
+            imageView.setImageBitmap(tess_result?.getAnnotatedBitmap(imageView.drawable.toBitmap()))
+        }
+    }
+
+    private fun doOcrTesseract(image: Bitmap): String {
+//        prepareTesseract()
+        return startOcrTesseract(image)
+    }
+
+    /**
+     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
+     * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
+     *
+     * @param bitmap
+     */
+    private fun startOcrTesseract(bitmap: Bitmap): String {
+        try {
+            var result = extractTextTesseract(bitmap)
+            return result.orEmpty()
+        } catch (e: java.lang.Exception) {
+            Log.e(TAG, e.message!!)
+            return ""
+        }
+    }
+
+    private fun extractTextTesseract(bitmap: Bitmap): String? {
         var tessBaseApi: TessBaseAPI? = null
         try {
             tessBaseApi = TessBaseAPI()
@@ -179,47 +199,13 @@ class MainActivity : AppCompatActivity() {
         return extractedText
     }
 
-
-
-    /**
-     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
-     * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
-     *
-     * @param bitmap
-     */
-    private fun startOcrTesseract(bitmap: Bitmap): String {
-        try {
-            var result = extractText(bitmap)
-            return result.orEmpty()
-        } catch (e: java.lang.Exception) {
-            Log.e(TAG, e.message!!)
-            return ""
-        }
-    }
-
     //------------------------------------------
     // Display results (Ml-Kit)
     //------------------------------------------
 
     private fun displayMlKitRecognitionResult() {
-        tv.text = getTextResultsToDisplay()
+        tv.text = getTextResultsToDisplayMlKit()
         imageView.setImageBitmap(getAnnotatedBitmapMlKit())
-    }
-
-    private fun getAnnotatedBitmap(adapter_result:RecognitionResultAdapter): Bitmap? {
-
-        if (null != adapter_result) {
-            val workingBitmap: Bitmap? = imageView.drawable.toBitmap()
-            val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
-
-            //Draw the image bitmap into the cavas
-            val canvas = mutableBitmap?.let { Canvas(it) }
-
-            drawBoxesOnCanvas(canvas, adapter_result!!, Color.RED)
-            return mutableBitmap
-        }
-
-        return null
     }
 
     private fun getAnnotatedBitmapMlKit(): Bitmap? {
@@ -237,40 +223,13 @@ class MainActivity : AppCompatActivity() {
         // Get different images orientations
         for (i in angles.indices) {
             angle = angles[i]
-            drawBoxesOnCanvas(canvas, RecognitionResultAdapter(blocks_angles[angle]), colors[i])
+            RecognitionResultAdapter(blocks_angles[angle]).drawBoxesOnCanvas(canvas, colors[i])
         }
 
         return mutableBitmap
     }
 
-    private fun drawBoxesOnCanvas(
-        canvas: Canvas?, blocks: RecognitionResultAdapter, color: Int) {
-
-            // Line (stroke) options
-           var paint = Paint()
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2F
-            paint.isAntiAlias = true
-            paint.textSize = 20F;
-            paint.color = color
-
-        if (null != canvas && null != blocks) {
-            for (i in blocks.text_blocks.indices) {
-                val block = blocks.text_blocks[i]
-                if (block?.block_bounding_box != null) {
-                    canvas.drawRect(block.block_bounding_box, paint)
-                    canvas.drawText(
-                        "$i",
-                        block.block_bounding_box!!.left.toFloat(),
-                        block.block_bounding_box!!.top.toFloat(), paint
-                    )
-                }
-            }
-        }
-    }
-
-
-    private fun getTextResultsToDisplay(): String {
+    private fun getTextResultsToDisplayMlKit(): String {
 
         var text_to_display:String = ""
         for (angle in angles) {
@@ -285,10 +244,6 @@ class MainActivity : AppCompatActivity() {
         }
         return text_to_display
     }
-
-//    private fun filteredBlockTextMlKit(blocks_angle: MutableList<Text.TextBlock>?): String {
-//        return blocks_angle?.let { getTextToDisplayMlKit(it, true) }.orEmpty()
-//    }
 
     private fun adjustCoordinatesByOriginalAngle(
         blocks: MutableList<Text.TextBlock>, angle: Int, width: Int, height: Int
@@ -321,6 +276,10 @@ class MainActivity : AppCompatActivity() {
         }
         return blocks
     }
+
+    //------------------------------------------
+    // Display results (common)
+    //------------------------------------------
 
     private fun getRectangleFromCorners(cornerPoints: Array<Point>?): Rect {
         var rect = Rect(0, 0, 0, 0)
@@ -372,46 +331,6 @@ class MainActivity : AppCompatActivity() {
             rotateXCoordinate(point.x, point.y, angle, width, height),
             rotateYCoordinate(point.x, point.y, angle, width, height)
         )
-    }
-
-//    private fun getTextToDisplayMlKit(
-//        blocks: MutableList<Text.TextBlock>, use_filter_flag: Boolean = false
-//    ): String {
-//
-//        var text_to_display = "\n"
-//        for (i in 0 until blocks.size) {
-//            var block = blocks[i]
-//            text_to_display += "BLOCK $i (" +
-//                    "${block.boundingBox?.left}, " +
-//                    "${block.boundingBox?.bottom}):\n"
-//            text_to_display += getFilteredTextMlKit(block, use_filter_flag) + "\n"
-//        }
-//        return text_to_display
-//    }
-
-
-//    private fun getFilteredTextMlKit(block: Text.TextBlock, use_filter_flag: Boolean): String {
-//        val line_length_threshold = 2;
-//
-//        if (!use_filter_flag)
-//            return block.text
-//
-//        var filteredText = ""
-//        for (line in block.lines) {
-//            if (line.text.length >= line_length_threshold)
-//                filteredText += line.text + "\n"
-//        }
-//        return filteredText
-//    }
-
-    //------------------------------------------
-    // Get other tesseract results
-    //------------------------------------------
-
-    private fun displayOtherTesseractResults(tessResult: TessBaseAPI?) {
-
-        var test = tessResult?.words
-        tv.text = test.toString()
     }
 
     //------------------------------------------
