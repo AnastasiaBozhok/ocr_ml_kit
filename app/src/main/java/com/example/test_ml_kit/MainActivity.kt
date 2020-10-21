@@ -30,10 +30,13 @@ import kotlin.math.sqrt
 class MainActivity : AppCompatActivity() {
 
     // If false, Tesseract will be used instead of ML-Kit
-    private val USE_ML_KIT_FLAG = false
+    private val USE_ML_KIT_FLAG = true
 
+    // Ml-Kit settings
 //    private val angles = intArrayOf(0, 90, 180, 270)
     private val angles = intArrayOf(0, 270)
+
+    // Ml-Kit data variables
     // <image rotation angle, recognized text for the current angle>
     private var blocks_angles: Map<Int, MutableList<Text.TextBlock>> = mapOf<Int, MutableList<Text.TextBlock>>()
     private var image: InputImage? = null
@@ -43,6 +46,9 @@ class MainActivity : AppCompatActivity() {
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
     private val lang = "eng"
+
+    // Tesseract data variables
+    private var tess_result: TessBaseAPI?  = null
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,7 +102,8 @@ class MainActivity : AppCompatActivity() {
                 )
             } else {
                 val result = image!!.bitmapInternal?.let { doOcrTesseract(it) }
-                tv.setText(result)
+                tv.text = result
+//                displayOtherTesseractResults(tess_result)
             }
 
         }
@@ -156,6 +163,7 @@ class MainActivity : AppCompatActivity() {
         var extractedText = "empty result"
         try {
             extractedText = tessBaseApi?.getUTF8Text().orEmpty()
+            tess_result = tessBaseApi
         } catch (e: java.lang.Exception) {
             Log.e(TAG, "Error in recognizing text.")
         }
@@ -234,10 +242,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun getTextResultsToDisplay(): String {
+
         var text_to_display:String = ""
         for (angle in angles) {
             text_to_display += "Orientation $angle: \n"
-            var angleTexts: String = filteredBlockText(blocks_angles[angle])
+//            var angleTexts: String = filteredBlockTextMlKit(blocks_angles[angle])
+
+            var recognition_result_angle = RecognitionResultAdapter(blocks_angles[angle])
+            var angleTexts: String = recognition_result_angle.filteredBlockText()
+
             if (angleTexts.length > 1)
                 text_to_display += angleTexts
             text_to_display += "\n"
@@ -245,9 +258,9 @@ class MainActivity : AppCompatActivity() {
         return text_to_display
     }
 
-    private fun filteredBlockText(blocks_angle: MutableList<Text.TextBlock>?): String {
-        return blocks_angle?.let { getTextToDisplay(it, true) }.orEmpty()
-    }
+//    private fun filteredBlockTextMlKit(blocks_angle: MutableList<Text.TextBlock>?): String {
+//        return blocks_angle?.let { getTextToDisplayMlKit(it, true) }.orEmpty()
+//    }
 
     private fun adjustCoordinatesByOriginalAngle(
         blocks: MutableList<Text.TextBlock>, angle: Int, width: Int, height: Int
@@ -333,36 +346,45 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+//    private fun getTextToDisplayMlKit(
+//        blocks: MutableList<Text.TextBlock>, use_filter_flag: Boolean = false
+//    ): String {
+//
+//        var text_to_display = "\n"
+//        for (i in 0 until blocks.size) {
+//            var block = blocks[i]
+//            text_to_display += "BLOCK $i (" +
+//                    "${block.boundingBox?.left}, " +
+//                    "${block.boundingBox?.bottom}):\n"
+//            text_to_display += getFilteredTextMlKit(block, use_filter_flag) + "\n"
+//        }
+//        return text_to_display
+//    }
 
-    private fun getTextToDisplay(
-        blocks: MutableList<Text.TextBlock>, use_filter_flag: Boolean = false
-    ): String {
 
-        var text_to_display = "\n"
-        for (i in 0 until blocks.size) {
-            var block = blocks[i]
-            text_to_display += "BLOCK $i (" +
-                    "${block.cornerPoints?.get(0)?.x}, " +
-                    "${block.cornerPoints?.get(0)?.y}):\n"
-            text_to_display += getFilteredText(block, use_filter_flag) + "\n"
-        }
-        return text_to_display
+//    private fun getFilteredTextMlKit(block: Text.TextBlock, use_filter_flag: Boolean): String {
+//        val line_length_threshold = 2;
+//
+//        if (!use_filter_flag)
+//            return block.text
+//
+//        var filteredText = ""
+//        for (line in block.lines) {
+//            if (line.text.length >= line_length_threshold)
+//                filteredText += line.text + "\n"
+//        }
+//        return filteredText
+//    }
+
+    //------------------------------------------
+    // Get other tesseract results
+    //------------------------------------------
+
+    private fun displayOtherTesseractResults(tessResult: TessBaseAPI?) {
+
+        var test = tessResult?.words
+        tv.text = test.toString()
     }
-
-    private fun getFilteredText(block: Text.TextBlock, use_filter_flag: Boolean): String {
-        val line_length_threshold = 2;
-
-        if (!use_filter_flag)
-            return block.text
-
-        var filteredText = ""
-        for (line in block.lines) {
-            if (line.text.length >= line_length_threshold)
-                filteredText += line.text + "\n"
-        }
-        return filteredText
-    }
-
 
     //------------------------------------------
     // Set up a Tesseract model
