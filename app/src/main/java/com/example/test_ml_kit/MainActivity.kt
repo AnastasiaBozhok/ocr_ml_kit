@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
             val result = doOcrTesseract(image!!.bitmapInternal!!)
 //                tv.text = result
             tv.text = tess_result?.filteredBlockText()
+            imageView.setImageBitmap(tess_result?.let { getAnnotatedBitmap(it) })
         }
     }
 
@@ -205,47 +206,20 @@ class MainActivity : AppCompatActivity() {
         imageView.setImageBitmap(getAnnotatedBitmapMlKit())
     }
 
-    private fun getAnnotatedBitmap(): Bitmap? {
+    private fun getAnnotatedBitmap(adapter_result:RecognitionResultAdapter): Bitmap? {
 
-        val workingBitmap: Bitmap? = imageView.drawable.toBitmap()
-        val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
+        if (null != adapter_result) {
+            val workingBitmap: Bitmap? = imageView.drawable.toBitmap()
+            val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
 
-        //Draw the image bitmap into the cavas
-        val canvas = mutableBitmap?.let { Canvas(it) }
+            //Draw the image bitmap into the cavas
+            val canvas = mutableBitmap?.let { Canvas(it) }
 
-        // Line options
-        val paint = Paint()
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2F
-        paint.isAntiAlias = true
-        paint.textSize = 20F;
-
-        val colors = listOf<Int>(Color.RED, Color.BLUE, Color.MAGENTA, Color.CYAN)
-        var angle: Int = 0
-        var blocks:MutableList<Text.TextBlock>? = mutableListOf()
-
-        // Get rectangles for not rotated image
-        for (i in angles.indices) {
-            paint.color = colors[i]
-            angle = angles[i]
-            blocks = blocks_angles[angle]
-            if (blocks != null) {
-                for (i in blocks.indices) {
-                    val block = blocks[i]
-                    block?.boundingBox?.let {canvas?.drawRect(it, paint) }
-                    block?.boundingBox?.left?.toFloat()?.let {
-                        if (canvas != null) {
-                            canvas.drawText(
-                                "$i",
-                                it, block?.boundingBox!!.top.toFloat(), paint
-                            )
-                        }
-                    }
-                }
-            }
+            drawBoxesOnCanvas(canvas, adapter_result!!, Color.RED)
+            return mutableBitmap
         }
 
-        return mutableBitmap
+        return null
     }
 
     private fun getAnnotatedBitmapMlKit(): Bitmap? {
@@ -256,44 +230,45 @@ class MainActivity : AppCompatActivity() {
         //Draw the image bitmap into the cavas
         val canvas = mutableBitmap?.let { Canvas(it) }
 
-        // Line options
-        val paint = Paint()
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2F
-        paint.isAntiAlias = true
-        paint.textSize = 20F;
-
         val colors = listOf<Int>(Color.RED, Color.BLUE, Color.MAGENTA, Color.CYAN)
         var angle: Int = 0
         var blocks:MutableList<Text.TextBlock>? = mutableListOf()
 
-        // Get rectangles for not rotated image
+        // Get different images orientations
         for (i in angles.indices) {
-            paint.color = colors[i]
             angle = angles[i]
-            blocks = blocks_angles[angle]
-            if (blocks != null) {
-                for (i in blocks.indices) {
-                    val block = blocks[i]
-                    drawBoxesOnCanvasMlKit(canvas, blocks[i], i, paint)
-                }
-            }
+            drawBoxesOnCanvas(canvas, RecognitionResultAdapter(blocks_angles[angle]), colors[i])
         }
 
         return mutableBitmap
     }
 
-    private fun drawBoxesOnCanvasMlKit(
-        canvas: Canvas?, block: Text.TextBlock, block_num: Int, paint: Paint) {
+    private fun drawBoxesOnCanvas(
+        canvas: Canvas?, blocks: RecognitionResultAdapter, color: Int) {
 
-        if (null != canvas && null != block && null != block?.boundingBox) {
-            canvas.drawRect(block.boundingBox, paint)
-            canvas.drawText("$block_num",
-                block.boundingBox!!.left.toFloat(),
-                block.boundingBox!!.top.toFloat(), paint)
+            // Line (stroke) options
+           var paint = Paint()
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2F
+            paint.isAntiAlias = true
+            paint.textSize = 20F;
+            paint.color = color
+
+        if (null != canvas && null != blocks) {
+            for (i in blocks.text_blocks.indices) {
+                val block = blocks.text_blocks[i]
+                if (block?.block_bounding_box != null) {
+                    canvas.drawRect(block.block_bounding_box, paint)
+                    canvas.drawText(
+                        "$i",
+                        block.block_bounding_box!!.left.toFloat(),
+                        block.block_bounding_box!!.top.toFloat(), paint
+                    )
+                }
+            }
         }
-
     }
+
 
     private fun getTextResultsToDisplay(): String {
 
