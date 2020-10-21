@@ -36,4 +36,5 @@ dependencies {
 
     // Tesseract model v4
     implementation 'cz.adaptech.android:tesseract4android:2.1.0'
+//    implementation 'com.rmtheis:tess-two:9.0.0'
 }

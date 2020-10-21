@@ -76,42 +76,38 @@ class MainActivity : AppCompatActivity() {
 
     private fun ocrButtonClickedHandler() {
         image = readImage()
-        imageView.setImageBitmap(image?.bitmapInternal)
 
         if (null != image) {
+            imageView.setImageBitmap(image!!.bitmapInternal)
+
             if (USE_ML_KIT_FLAG) {
                 // TODO: 19/10/2020 (Anastasia) attention! there might be a conflict
                 // when TextRecognition is called for a new image orientation,
                 // but the results of a previous angle are not yet received
                 for (angle in angles) {
-                    recognizeImage(image!!, angle)
+                    recognizeImageMlKit(image!!, angle)
                 }
 
                 // TODO: 19/10/2020 (Anastasia) attention! the function displayRecognitionResult
                 // should be called after the TextRecognition is finished for all angles
                 (Handler()).postDelayed(
-                    this::displayRecognitionResult,
+                    this::displayMlKitRecognitionResult,
                     (sqrt((image!!.width * image!!.height).toDouble()) * angles.size).toLong()
                 )
             } else {
-
-                // Start a coroutine
-//                GlobalScope.launch {
-//                    delay(1000)
-                    image!!.bitmapInternal?.let { doOCR(it) }
-//                }
-
-//                tv.text = image!!.bitmapInternal?.let { extractText(it) }
+                val result = image!!.bitmapInternal?.let { doOcrTesseract(it) }
+                tv.setText(result)
             }
+
         }
     }
 
-    private fun doOCR(image: Bitmap) {
+    private fun doOcrTesseract(image: Bitmap): String {
 //        prepareTesseract()
-        startOCR(image)
+        return startOcrTesseract(image)
     }
 
-    private fun recognizeImage(image: InputImage, angle: Int) {
+    private fun recognizeImageMlKit(image: InputImage, angle: Int) {
 
         if (null != image) {
             val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
@@ -137,10 +133,10 @@ class MainActivity : AppCompatActivity() {
         try {
             tessBaseApi = TessBaseAPI()
         } catch (e: java.lang.Exception) {
-            Log.e("FragmentActivity.TAG", e.message!!)
+            Log.e(TAG, e.message!!)
             if (tessBaseApi == null) {
                 Log.e(
-                    "FragmentActivity.TAG",
+                    TAG,
                     "TessBaseAPI is null. TessFactory not returning tess object."
                 )
             }
@@ -154,13 +150,14 @@ class MainActivity : AppCompatActivity() {
 //        //blackList Example
 //        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!@#$%^&*()_+=-qwertyuiop[]}{POIU" +
 //                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
-        Log.d("FragmentActivity.TAG", "Training file loaded")
+
+        Log.d(TAG, "Training file loaded")
         tessBaseApi?.setImage(bitmap)
         var extractedText = "empty result"
         try {
             extractedText = tessBaseApi?.getUTF8Text().orEmpty()
         } catch (e: java.lang.Exception) {
-            Log.e("FragmentActivity.TAG", "Error in recognizing text.")
+            Log.e(TAG, "Error in recognizing text.")
         }
         tessBaseApi?.end()
         return extractedText
@@ -172,14 +169,15 @@ class MainActivity : AppCompatActivity() {
      * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
      * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
      *
-     * @param imgUri
+     * @param bitmap
      */
-    private fun startOCR(bitmap: Bitmap) {
+    private fun startOcrTesseract(bitmap: Bitmap): String {
         try {
             var result = extractText(bitmap)
-            tv.setText(result)
+            return result.orEmpty()
         } catch (e: java.lang.Exception) {
-            Log.e("FragmentActivity.TAG", e.message!!)
+            Log.e(TAG, e.message!!)
+            return ""
         }
     }
 
@@ -187,7 +185,7 @@ class MainActivity : AppCompatActivity() {
     // Display results (Ml-Kit)
     //------------------------------------------
 
-    private fun displayRecognitionResult() {
+    private fun displayMlKitRecognitionResult() {
         tv.text = getTextResultsToDisplay()
         imageView.setImageBitmap(getAnnotatedBitmap())
     }
@@ -390,12 +388,12 @@ class MainActivity : AppCompatActivity() {
         if (!dir.exists()) {
             if (!dir.mkdirs()) {
                 Log.e(
-                    "test",
+                    TAG,
                     "ERROR: Creation of directory $path failed, check does Android Manifest have permission to write to external storage."
                 )
             }
         } else {
-            Log.i("test", "Created directory $path")
+            Log.i(TAG, "Created directory $path")
         }
     }
 
@@ -424,11 +422,11 @@ class MainActivity : AppCompatActivity() {
                     }
                     `in`.close()
                     out.close()
-                    Log.d("FragmentActivity.TAG", "Copied " + fileName + "to tessdata")
+                    Log.d(TAG, "Copied " + fileName + "to tessdata")
                 }
             }
         } catch (e: IOException) {
-            Log.e("FragmentActivity.TAG", "Unable to copy files to tessdata $e")
+            Log.e(TAG, "Unable to copy files to tessdata $e")
         }
     }
 
@@ -491,7 +489,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val TAG = "ChooserActivity"
+        private const val TAG = "MainActivity"
         private const val PERMISSION_REQUESTS = 1
     }
 
