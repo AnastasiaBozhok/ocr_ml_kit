@@ -1,7 +1,10 @@
 package com.example.test_ml_kit
 
 import android.graphics.Rect
+import android.util.Log
 import com.google.mlkit.vision.text.Text
+import com.googlecode.tesseract.android.TessBaseAPI
+import hocr4j.Page
 import java.util.*
 import kotlin.properties.Delegates
 
@@ -10,23 +13,28 @@ class RecognitionResultAdapter {
     var text_blocks: MutableList<TextBlock> = ArrayList<TextBlock>()
 
     class TextBlock {
-        var recognized_text: String by Delegates.notNull()
-        var bounding_box: Rect? = null
+        var block_text: String by Delegates.notNull()
+        var block_bounding_box: Rect? = null
         var text_lines: MutableList<TextBase> = ArrayList<TextBase>()
 
-        constructor(mlkit_block:Text.TextBlock) {
-            recognized_text = mlkit_block.text
-            bounding_box = mlkit_block.boundingBox
+        constructor(mlkit_block: Text.TextBlock) {
+            block_text = mlkit_block.text
+            block_bounding_box = mlkit_block.boundingBox
             for (line in mlkit_block.lines) {
                 text_lines.add(TextBase(line))
             }
         }
 
+        constructor(recognized_text: String, bounding_box: Rect?) {
+            this.block_text = recognized_text
+            this.block_bounding_box = bounding_box
+        }
+
         fun getFilteredText(use_filter_flag: Boolean): String {
             val line_length_threshold = 2;
 
-            if (!use_filter_flag)
-                return this.recognized_text
+            if (!use_filter_flag || this.text_lines.isEmpty())
+                return this.block_text
 
             var filteredText = ""
             for (line in this.text_lines) {
@@ -55,6 +63,25 @@ class RecognitionResultAdapter {
         }
     }
 
+    constructor(tesseract_result: TessBaseAPI?) {
+        if (tesseract_result != null) {
+            // Iterate through the results.
+            val iterator = tesseract_result.resultIterator
+            iterator.begin()
+            do {
+                val current_block_text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_PARA)
+                val current_block_box = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_PARA)
+                text_blocks.add(TextBlock(current_block_text,current_block_box))
+            } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_PARA))
+
+            var hocr = "<body>\n"
+            hocr += tesseract_result.getHOCRText(0)
+            hocr += "</body>"
+            var test = Page.fromHocr(mutableListOf(hocr))
+            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
+        }
+    }
+
     fun filteredBlockText(): String {
         return getTextToDisplay(true)
     }
@@ -64,8 +91,8 @@ class RecognitionResultAdapter {
         for (i in 0 until this.text_blocks.size) {
             var block = this.text_blocks[i]
             text_to_display += "BLOCK $i (" +
-                    "${block.bounding_box?.left}, " +
-                    "${block.bounding_box?.bottom}):\n"
+                    "${block.block_bounding_box?.left}, " +
+                    "${block.block_bounding_box?.bottom}):\n"
             text_to_display += block.getFilteredText(use_filter_flag) + "\n"
         }
         return text_to_display

@@ -30,7 +30,7 @@ import kotlin.math.sqrt
 class MainActivity : AppCompatActivity() {
 
     // If false, Tesseract will be used instead of ML-Kit
-    private val USE_ML_KIT_FLAG = true
+    private val USE_ML_KIT_FLAG = false
 
     // Ml-Kit settings
 //    private val angles = intArrayOf(0, 90, 180, 270)
@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     private val lang = "eng"
 
     // Tesseract data variables
-    private var tess_result: TessBaseAPI?  = null
+    private var tess_result: RecognitionResultAdapter?  = null
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,7 +103,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val result = image!!.bitmapInternal?.let { doOcrTesseract(it) }
                 tv.text = result
-//                displayOtherTesseractResults(tess_result)
+                tv.text = tess_result?.filteredBlockText()
             }
 
         }
@@ -162,8 +162,9 @@ class MainActivity : AppCompatActivity() {
         tessBaseApi?.setImage(bitmap)
         var extractedText = "empty result"
         try {
+            // GetUTF8Text calls Recognize behind the scene
             extractedText = tessBaseApi?.getUTF8Text().orEmpty()
-            tess_result = tessBaseApi
+            tess_result = RecognitionResultAdapter(tessBaseApi)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, "Error in recognizing text.")
         }
@@ -246,7 +247,6 @@ class MainActivity : AppCompatActivity() {
         var text_to_display:String = ""
         for (angle in angles) {
             text_to_display += "Orientation $angle: \n"
-//            var angleTexts: String = filteredBlockTextMlKit(blocks_angles[angle])
 
             var recognition_result_angle = RecognitionResultAdapter(blocks_angles[angle])
             var angleTexts: String = recognition_result_angle.filteredBlockText()

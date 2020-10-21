@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.test_ml_kit"
-        minSdkVersion 16
+        minSdkVersion 26
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"
@@ -37,4 +37,8 @@ dependencies {
     // Tesseract model v4
     implementation 'cz.adaptech.android:tesseract4android:2.1.0'
 //    implementation 'com.rmtheis:tess-two:9.0.0'
+
+    // Required for hocr4j library code
+    implementation group: 'com.google.guava', name: 'guava', version: '23.5-jre'
+    implementation 'org.apache.commons:commons-text:1.6'
 }
