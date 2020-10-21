@@ -73,7 +73,8 @@ public class Line extends DelegatingUnmodifiableList<Word> implements Bounded {
         words = new ArrayList<Word>();
         if (e instanceof HocrTag) {
             HocrTag tag = (HocrTag) e;
-            if (tag.name.equals("span") && "ocr_line".equals(tag.clazz)) {
+            // Changed by Anastasia 21/10/2020
+            if (tag.name.equals("span") && ("ocr_line".equals(tag.clazz) || "ocr_caption".equals(tag.clazz))) {
                 for (HocrElement k : tag.elements) {
                     words.add(new Word(k));
                 }

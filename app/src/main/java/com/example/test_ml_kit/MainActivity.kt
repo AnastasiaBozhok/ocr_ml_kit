@@ -64,13 +64,13 @@ class MainActivity : AppCompatActivity() {
     private fun readImage(): InputImage? {
         var file: File = File("/sdcard/Download", editText.text.toString())
         var uri: Uri = Uri.fromFile(file)
-        try {
-            image = InputImage.fromFilePath(applicationContext, uri)
+        return try {
+            return InputImage.fromFilePath(applicationContext, uri)
         } catch (e: IOException) {
             tv.text = e.toString()
             e.printStackTrace()
+            null
         }
-        return image
     }
 
 
@@ -191,10 +191,16 @@ class MainActivity : AppCompatActivity() {
         try {
             // GetUTF8Text calls Recognize behind the scene
             extractedText = tessBaseApi?.getUTF8Text().orEmpty()
-            tess_result = RecognitionResultAdapter(tessBaseApi)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, "Error in recognizing text.")
         }
+        tess_result = try {
+            RecognitionResultAdapter(tessBaseApi)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in parsing tesseract horc result.")
+            null
+        }
+
         tessBaseApi?.end()
         return extractedText
     }
@@ -458,7 +464,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val TAG = "MainActivity"
+        private const val TAG = android.content.ContentValues.TAG
         private const val PERMISSION_REQUESTS = 1
     }
 
