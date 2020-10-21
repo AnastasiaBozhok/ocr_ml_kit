@@ -6,6 +6,7 @@ import android.graphics.*
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
@@ -19,8 +20,7 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.googlecode.tesseract.android.TessBaseAPI
 import kotlinx.android.synthetic.main.activity_main.*
-import java.io.File
-import java.io.IOException
+import java.io.*
 import java.util.*
 import kotlin.math.sqrt
 
@@ -29,13 +29,20 @@ import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
 
-    private val USE_ML_KIT_FLAG = true
+    // If false, Tesseract will be used instead of ML-Kit
+    private val USE_ML_KIT_FLAG = false
 
 //    private val angles = intArrayOf(0, 90, 180, 270)
     private val angles = intArrayOf(0, 270)
     // <image rotation angle, recognized text for the current angle>
     private var blocks_angles: Map<Int, MutableList<Text.TextBlock>> = mapOf<Int, MutableList<Text.TextBlock>>()
     private var image: InputImage? = null
+
+    // Tesseract settings
+    private val DATA_PATH =
+        Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
+    private val TESSDATA = "tessdata"
+    private val lang = "eng"
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,12 +69,6 @@ class MainActivity : AppCompatActivity() {
         return image
     }
 
-    private fun getModelPath(): String {
-        var file: File = File("/sdcard/Download", "eng.traineddata")
-        var uri: Uri = Uri.fromFile(file)
-
-        return uri.path.orEmpty()
-    }
 
     //------------------------------------------
     // OCR and visualization
@@ -93,10 +94,98 @@ class MainActivity : AppCompatActivity() {
                     (sqrt((image!!.width * image!!.height).toDouble()) * angles.size).toLong()
                 )
             } else {
-                tv.text = image!!.bitmapInternal?.let { extractText(it) }
+
+                // Start a coroutine
+//                GlobalScope.launch {
+//                    delay(1000)
+                    image!!.bitmapInternal?.let { doOCR(it) }
+//                }
+
+//                tv.text = image!!.bitmapInternal?.let { extractText(it) }
             }
         }
     }
+
+    private fun doOCR(image: Bitmap) {
+//        prepareTesseract()
+        startOCR(image)
+    }
+
+    private fun recognizeImage(image: InputImage, angle: Int) {
+
+        if (null != image) {
+            val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
+            val recognizer = TextRecognition.getClient()
+            val result = recognizer.process(image_rotated)
+                .addOnSuccessListener { visionText ->
+                    var blocks = visionText.textBlocks
+                    blocks = adjustCoordinatesByOriginalAngle(
+                        blocks, angle,
+                        image_rotated.width, image_rotated.height
+                    )
+
+                    blocks_angles += Pair(angle, blocks)
+                }
+                .addOnFailureListener { e ->
+                    e.printStackTrace()
+                }
+        }
+    }
+
+    private fun extractText(bitmap: Bitmap): String? {
+        var tessBaseApi: TessBaseAPI? = null
+        try {
+            tessBaseApi = TessBaseAPI()
+        } catch (e: java.lang.Exception) {
+            Log.e("FragmentActivity.TAG", e.message!!)
+            if (tessBaseApi == null) {
+                Log.e(
+                    "FragmentActivity.TAG",
+                    "TessBaseAPI is null. TessFactory not returning tess object."
+                )
+            }
+        }
+        tessBaseApi?.init(DATA_PATH, lang)
+
+//       //EXTRA SETTINGS
+//        //For example if we only want to detect numbers
+//        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_WHITELIST, "1234567890");
+//
+//        //blackList Example
+//        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!@#$%^&*()_+=-qwertyuiop[]}{POIU" +
+//                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
+        Log.d("FragmentActivity.TAG", "Training file loaded")
+        tessBaseApi?.setImage(bitmap)
+        var extractedText = "empty result"
+        try {
+            extractedText = tessBaseApi?.getUTF8Text().orEmpty()
+        } catch (e: java.lang.Exception) {
+            Log.e("FragmentActivity.TAG", "Error in recognizing text.")
+        }
+        tessBaseApi?.end()
+        return extractedText
+    }
+
+
+
+    /**
+     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
+     * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
+     *
+     * @param imgUri
+     */
+    private fun startOCR(bitmap: Bitmap) {
+        try {
+            var result = extractText(bitmap)
+            tv.setText(result)
+        } catch (e: java.lang.Exception) {
+            Log.e("FragmentActivity.TAG", e.message!!)
+        }
+    }
+
+    //------------------------------------------
+    // Display results (Ml-Kit)
+    //------------------------------------------
 
     private fun displayRecognitionResult() {
         tv.text = getTextResultsToDisplay()
@@ -161,41 +250,6 @@ class MainActivity : AppCompatActivity() {
     private fun filteredBlockText(blocks_angle: MutableList<Text.TextBlock>?): String {
         return blocks_angle?.let { getTextToDisplay(it, true) }.orEmpty()
     }
-
-    private fun recognizeImage(image: InputImage, angle: Int) {
-
-        if (null != image) {
-            val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
-            val recognizer = TextRecognition.getClient()
-            val result = recognizer.process(image_rotated)
-                .addOnSuccessListener { visionText ->
-                    var blocks = visionText.textBlocks
-                    blocks = adjustCoordinatesByOriginalAngle(
-                        blocks, angle,
-                        image_rotated.width, image_rotated.height
-                    )
-
-                    blocks_angles += Pair(angle, blocks)
-                }
-                .addOnFailureListener { e ->
-                    e.printStackTrace()
-                }
-        }
-    }
-
-
-    @Throws(java.lang.Exception::class)
-    private fun extractText(bitmap: Bitmap): String? {
-        val tessBaseApi = TessBaseAPI()
-        tessBaseApi.init(getModelPath(), "eng")
-        tessBaseApi.setImage(bitmap)
-        val extractedText = tessBaseApi.utF8Text
-        tessBaseApi.end()
-        return extractedText
-    }
-
-
-
 
     private fun adjustCoordinatesByOriginalAngle(
         blocks: MutableList<Text.TextBlock>, angle: Int, width: Int, height: Int
@@ -309,6 +363,73 @@ class MainActivity : AppCompatActivity() {
                 filteredText += line.text + "\n"
         }
         return filteredText
+    }
+
+
+    //------------------------------------------
+    // Set up a Tesseract model
+    //------------------------------------------
+
+    private fun prepareTesseract() {
+        try {
+            prepareDirectory(DATA_PATH + TESSDATA)
+        } catch (e: java.lang.Exception) {
+            e.printStackTrace()
+        }
+        copyTessDataFiles(TESSDATA)
+    }
+
+    /**
+     * Prepare directory on external storage
+     *
+     * @param path
+     * @throws Exception
+     */
+    private fun prepareDirectory(path: String) {
+        val dir = File(path)
+        if (!dir.exists()) {
+            if (!dir.mkdirs()) {
+                Log.e(
+                    "test",
+                    "ERROR: Creation of directory $path failed, check does Android Manifest have permission to write to external storage."
+                )
+            }
+        } else {
+            Log.i("test", "Created directory $path")
+        }
+    }
+
+    /**
+     * Copy tessdata files (located on assets/tessdata) to destination directory
+     *
+     * @param path - name of directory with .traineddata files
+     */
+    private fun copyTessDataFiles(path: String) {
+        try {
+            val fileList = assets.list(path)
+            for (fileName in fileList!!) {
+
+                // open file within the assets folder
+                // if it is not already there copy it to the sdcard
+                val pathToDataFile = "$DATA_PATH$path/$fileName"
+                if (!File(pathToDataFile).exists()) {
+                    val `in`: InputStream = assets.open("$path/$fileName")
+                    val out: OutputStream = FileOutputStream(pathToDataFile)
+
+                    // Transfer bytes from in to out
+                    val buf = ByteArray(1024)
+                    var len: Int
+                    while (`in`.read(buf).also { len = it } > 0) {
+                        out.write(buf, 0, len)
+                    }
+                    `in`.close()
+                    out.close()
+                    Log.d("FragmentActivity.TAG", "Copied " + fileName + "to tessdata")
+                }
+            }
+        } catch (e: IOException) {
+            Log.e("FragmentActivity.TAG", "Unable to copy files to tessdata $e")
+        }
     }
 
     //------------------------------------------
