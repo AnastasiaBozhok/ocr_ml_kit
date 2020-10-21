@@ -19,6 +19,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.googlecode.tesseract.android.TessBaseAPI
+import com.googlecode.tesseract.android.TessBaseAPI.PageSegMode.PSM_AUTO_OSD
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.*
 import java.util.*
@@ -157,6 +158,9 @@ class MainActivity : AppCompatActivity() {
 //        //blackList Example
 //        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!@#$%^&*()_+=-qwertyuiop[]}{POIU" +
 //                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
+
+        // default tessedit_pageseg_mode assumes a single uniform block of vertically aligned text
+        tessBaseApi?.setVariable("tessedit_pageseg_mode", TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString())
 
         Log.d(TAG, "Training file loaded")
         tessBaseApi?.setImage(bitmap)

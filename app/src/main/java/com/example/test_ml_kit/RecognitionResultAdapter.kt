@@ -69,13 +69,13 @@ class RecognitionResultAdapter {
             val iterator = tesseract_result.resultIterator
             iterator.begin()
             do {
-                val current_block_text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_PARA)
-                val current_block_box = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_PARA)
+                val current_block_text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
+                val current_block_box = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
                 text_blocks.add(TextBlock(current_block_text,current_block_box))
-            } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_PARA))
+            } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_BLOCK))
 
             var hocr = "<body>\n"
-            hocr += tesseract_result.getHOCRText(0)
+            hocr += tesseract_result.getHOCRText(1)
             hocr += "</body>"
             var test = Page.fromHocr(mutableListOf(hocr))
             Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
@@ -83,7 +83,7 @@ class RecognitionResultAdapter {
     }
 
     fun filteredBlockText(): String {
-        return getTextToDisplay(true)
+        return getTextToDisplay(false)
     }
 
     private fun getTextToDisplay(use_filter_flag: Boolean): String {
