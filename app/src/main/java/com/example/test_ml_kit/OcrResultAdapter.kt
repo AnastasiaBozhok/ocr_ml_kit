@@ -113,6 +113,7 @@ class OcrResultAdapter {
 //            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
 
             this.removeBlocksWithEmptyText()
+            this.removeBlocksWithLowConfidence(50)
         }
     }
 
@@ -120,12 +121,25 @@ class OcrResultAdapter {
     // Filtering results
     // --------------------------------------
 
-    fun removeBlocksWithEmptyText() {
+    private fun removeBlocksWithEmptyText() {
         var indices_to_remove = mutableListOf<Int>()
         for (i in text_blocks.indices) {
             val block_text = text_blocks[i].block_text
             // replace("\\s".toRegex(), "") --> remove all whitespace
             if (block_text.replace("\\s".toRegex(), "").isEmpty()){
+                indices_to_remove.add(i)
+            }
+        }
+        indices_to_remove.reverse()
+        for (i in indices_to_remove)
+            text_blocks.removeAt(i)
+    }
+
+    private fun removeBlocksWithLowConfidence(confidence_threshold: Int) {
+        var indices_to_remove = mutableListOf<Int>()
+        for (i in text_blocks.indices) {
+            if (null != text_blocks[i].block_confidence &&
+                text_blocks[i].block_confidence!! < confidence_threshold){
                 indices_to_remove.add(i)
             }
         }
@@ -146,7 +160,7 @@ class OcrResultAdapter {
         var text_to_display = "\n"
         for (i in 0 until this.text_blocks.size) {
             var block = this.text_blocks[i]
-            text_to_display += "BLOCK $i (" +
+            text_to_display += "BLOCK ${i+1} (" +
                     "${block.block_bounding_box?.left}, " +
                     "${block.block_bounding_box?.bottom}):\n"
             text_to_display += block.getFilteredText(use_filter_flag) + "\n"
@@ -192,7 +206,7 @@ class OcrResultAdapter {
                 if (block?.block_bounding_box != null) {
                     canvas.drawRect(block.block_bounding_box, paint)
                     canvas.drawText(
-                        "$i",
+                        "${i+1}",
                         block.block_bounding_box!!.left.toFloat(),
                         block.block_bounding_box!!.top.toFloat() - 4, paint
                     )
