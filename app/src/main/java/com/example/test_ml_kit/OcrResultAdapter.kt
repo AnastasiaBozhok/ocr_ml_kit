@@ -1,19 +1,15 @@
 package com.example.test_ml_kit
 
 import android.graphics.*
+import android.util.Log
 import com.google.mlkit.vision.text.Text
 import com.googlecode.tesseract.android.TessBaseAPI
 import hocr4j.Page
-import java.lang.IllegalArgumentException
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
 class OcrResultAdapter {
-
-    // --------------------------------------
-    // Class attributes and nested classes
-    // --------------------------------------
 
     var text_blocks: MutableList<TextBlock> = ArrayList<TextBlock>()
     var angle: Int = 0
@@ -24,11 +20,11 @@ class OcrResultAdapter {
         var text_lines: MutableList<TextBase> = ArrayList<TextBase>()
         var block_confidence: Float? = null
 
-        constructor(mlkit_block: Text.TextBlock) {
+        constructor(mlkit_block: Text.TextBlock, angle: Int = 0) {
             block_text = mlkit_block.text
             block_bounding_box = mlkit_block.boundingBox
             for (line in mlkit_block.lines) {
-                text_lines.add(TextBase(line))
+                text_lines.add(TextBase(line, angle))
             }
         }
 
@@ -64,41 +60,33 @@ class OcrResultAdapter {
         var recognized_text: String by Delegates.notNull()
         var bounding_box: Rect? = null
 
-        constructor(mlkit_line:Text.Line) {
+        constructor(mlkit_line:Text.Line, angle: Int = 0) {
             recognized_text = mlkit_line.text
             bounding_box = mlkit_line.boundingBox
         }
     }
 
-    // --------------------------------------
-    // Constructors from ml-kit and tesseract formats
-    // --------------------------------------
-
-    constructor(mlkit_result: MutableList<Text.TextBlock>?, angle:Int? = null) {
-        this.angle = if (null == angle) 0 else angle
-
+    constructor(mlkit_result: MutableList<Text.TextBlock>?, angle:Int = 0) {
+        this.angle = angle
         if (mlkit_result != null) {
             for (block in mlkit_result) {
-                text_blocks.add(TextBlock(block))
+                text_blocks.add(TextBlock(block, angle))
             }
         }
-        this.removeBlocksWithEmptyText()
+        this.removeEmptyRecognizedText()
     }
 
-    constructor(tesseract_result: TessBaseAPI?, angle:Int? = null) {
-        this.angle = if (null == angle) 0 else angle
-
+    constructor(tesseract_result: TessBaseAPI?, angle:Int = 0) {
         if (tesseract_result != null) {
             // Iterate through the results.
             val iterator = tesseract_result.resultIterator
-            var iterator_level = TessBaseAPI.PageIteratorLevel.RIL_BLOCK
             iterator.begin()
             do {
-                val current_block_text = iterator.getUTF8Text(iterator_level)
-                val current_block_box = iterator.getBoundingRect(iterator_level)
-                val current_block_confidence = iterator.confidence(iterator_level)
+                val current_block_text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
+                val current_block_box = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
+                val current_block_confidence = iterator.confidence(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
                 text_blocks.add(TextBlock(current_block_text,current_block_box,current_block_confidence))
-            } while (iterator.next(iterator_level))
+            } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_BLOCK))
 
             var hocr = "<body>\n"
             hocr += tesseract_result.getHOCRText(1)
@@ -106,31 +94,9 @@ class OcrResultAdapter {
             var test = Page.fromHocr(mutableListOf(hocr))
 //            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
 
-            this.removeBlocksWithEmptyText()
+            this.removeEmptyRecognizedText()
         }
     }
-
-    // --------------------------------------
-    // Filtering results
-    // --------------------------------------
-
-    fun removeBlocksWithEmptyText() {
-        var indices_to_remove = mutableListOf<Int>()
-        for (i in text_blocks.indices) {
-            val block_text = text_blocks[i].block_text
-            // replace("\\s".toRegex(), "") --> remove all whitespace
-            if (block_text.replace("\\s".toRegex(), "").isEmpty()){
-                indices_to_remove.add(i)
-            }
-        }
-        indices_to_remove.reverse()
-        for (i in indices_to_remove)
-            text_blocks.removeAt(i)
-    }
-
-    // --------------------------------------
-    // Text to display
-    // --------------------------------------
 
     fun filteredBlockText(): String {
         return getTextToDisplay(false)
@@ -148,10 +114,6 @@ class OcrResultAdapter {
         return text_to_display
     }
 
-    // -----------------------------------------
-    // Visualize results on an image
-    // -----------------------------------------
-
     fun getAnnotatedBitmap(workingBitmap: Bitmap): Bitmap? {
 
         if (null != this) {
@@ -167,12 +129,14 @@ class OcrResultAdapter {
         return null
     }
 
-    fun drawBoxesOnCanvas(canvas: Canvas?, color: Int? = null) {
+    fun drawBoxesOnCanvas(
+        canvas: Canvas?, color: Int? = null) {
 
         // Line (stroke) options
         var paint = Paint()
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2F
+        paint.isAntiAlias = true
         paint.textSize = 20F;
         if (color != null) {
             paint.color = color
@@ -195,9 +159,20 @@ class OcrResultAdapter {
         }
     }
 
-    // TODO: 22/10/2020 (Anastasia)
-    // 1) Make it more efficient (without corner --> rectangle conversion)
-    // 2) Make it work with all angles (only 0 and 270 now)
+    fun removeEmptyRecognizedText() {
+        var indices_to_remove = mutableListOf<Int>()
+        for (i in text_blocks.indices) {
+            val block_text = text_blocks[i].block_text
+            // replace("\\s".toRegex(), "") --> remove all whitespace
+            if (block_text.replace("\\s".toRegex(), "").isEmpty()){
+                indices_to_remove.add(i)
+            }
+        }
+        indices_to_remove.reverse()
+        for (i in indices_to_remove)
+            text_blocks.removeAt(i)
+    }
+
     fun adjustCoordinatesByOriginalAngle(angle: Int, width: Int, height: Int): OcrResultAdapter {
 
         if (0 != angle) {
@@ -222,6 +197,8 @@ class OcrResultAdapter {
         }
         return this
     }
+
+
 
     private fun getCornersFromRectange(rect: Rect): Array<Point> {
         return arrayOf(
@@ -257,10 +234,7 @@ class OcrResultAdapter {
 //        return round((x - center_x) * cos(angle * Math.PI / 180) -
 //                (height - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
 
-        return if (270 == angle)
-            width - y
-        else
-            throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
+        return width - y
 
     }
 
@@ -276,11 +250,7 @@ class OcrResultAdapter {
 //                    (height - y - center_y) * cos(angle * Math.PI / 180) + (height - center_y)
 //        ).toInt()
 
-        return if (270 == angle)
-            x
-        else
-            throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
-
+        return x
     }
 
     private fun rotatePoint(point: Point, angle: Int, width: Int, height: Int): Point {
