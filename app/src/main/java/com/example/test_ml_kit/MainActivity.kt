@@ -33,9 +33,11 @@ class MainActivity : AppCompatActivity() {
 //    private val angles = intArrayOf(0, 90, 180, 270)
     private val angles = intArrayOf(0, 270)
 
-    // Ml-Kit data variables
+    // Data variables
     // <image rotation angle, recognized text for the current angle>
     private var recognition_results: Map<Int, OcrResultAdapter> = mapOf()
+
+    // Ml-Kit data variables
     private var mlkit_finished_flag = false
     private var image: InputImage? = null
 
@@ -44,9 +46,6 @@ class MainActivity : AppCompatActivity() {
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
     private val lang = "fra+eng"
-
-    // Tesseract data variables
-    private var tess_result: OcrResultAdapter?  = null
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -145,17 +144,14 @@ class MainActivity : AppCompatActivity() {
             imageView.setImageBitmap(bitmap)
 
             for (angle in angles) {
-                val result = doOcrTesseract(bitmap!!, angle)
+                val tess_result = doOcrTesseract(bitmap!!, angle)
                 if (null != tess_result) {
-                    recognition_results += Pair(0, tess_result!!)
+                    recognition_results += Pair(angle, tess_result!!)
                     imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
                 }
-
             }
 
-
-//                tv.text = result
-            tv.text = tess_result?.filteredBlockText()
+            tv.text = getTextResultsToDisplay()
             imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
        }
     }
@@ -171,7 +167,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun doOcrTesseract(image: Bitmap, angle: Int): String {
+    private fun doOcrTesseract(image: Bitmap, angle: Int): OcrResultAdapter? {
         val image = rotateBitmap(image, angle)
         return startOcrTesseract(image)
     }
@@ -188,17 +184,16 @@ class MainActivity : AppCompatActivity() {
      *
      * @param bitmap
      */
-    private fun startOcrTesseract(bitmap: Bitmap): String {
-        try {
-            var result = extractTextTesseract(bitmap)
-            return result.orEmpty()
+    private fun startOcrTesseract(bitmap: Bitmap): OcrResultAdapter? {
+        return try {
+            extractTextTesseract(bitmap)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, e.message!!)
-            return ""
+            null
         }
     }
 
-    private fun extractTextTesseract(bitmap: Bitmap): String? {
+    private fun extractTextTesseract(bitmap: Bitmap): OcrResultAdapter? {
         var tessBaseApi: TessBaseAPI? = null
         try {
             tessBaseApi = TessBaseAPI()
@@ -229,22 +224,21 @@ class MainActivity : AppCompatActivity() {
 
         Log.d(TAG, "Training file loaded")
         tessBaseApi?.setImage(bitmap)
-        var extractedText = "empty result"
         try {
             // GetUTF8Text calls Recognize behind the scene
-            extractedText = tessBaseApi?.getUTF8Text().orEmpty()
+            tessBaseApi?.getUTF8Text().orEmpty()
         } catch (e: java.lang.Exception) {
             Log.e(TAG, "Error in recognizing text.")
         }
-        tess_result = try {
+
+        return try {
             OcrResultAdapter(tessBaseApi)
         } catch (e: Exception) {
             Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
+        } finally {
+            tessBaseApi?.end()
         }
-
-        tessBaseApi?.end()
-        return extractedText
     }
 
     //------------------------------------------
@@ -252,7 +246,7 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun displayMlKitRecognitionResult() {
-        tv.text = getTextResultsToDisplayMlKit()
+        tv.text = getTextResultsToDisplay()
         imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
     }
 
@@ -273,7 +267,7 @@ class MainActivity : AppCompatActivity() {
         return mutableBitmap
     }
 
-    private fun getTextResultsToDisplayMlKit(): String {
+    private fun getTextResultsToDisplay(): String {
 
         var text_to_display:String = ""
         for (angle in angles) {
