@@ -129,9 +129,11 @@ class MainActivity : AppCompatActivity() {
         image = readImage()
 
         if (null != image && null != image!!.bitmapInternal) {
-            imageView.setImageBitmap(image!!.bitmapInternal)
+            var bitmap = image!!.bitmapInternal
+//            bitmap = rotateBitmap(bitmap!!, 270f)
+            imageView.setImageBitmap(bitmap)
 
-            val result = doOcrTesseract(image!!.bitmapInternal!!)
+            val result = doOcrTesseract(bitmap!!)
 //                tv.text = result
             tv.text = tess_result?.filteredBlockText()
             imageView.setImageBitmap(tess_result?.getAnnotatedBitmap(imageView.drawable.toBitmap()))
@@ -139,8 +141,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun doOcrTesseract(image: Bitmap): String {
-//        prepareTesseract()
+        prepareTesseract()
         return startOcrTesseract(image)
+    }
+
+    fun rotateBitmap(source: Bitmap, angle: Float): Bitmap? {
+        val matrix = Matrix()
+        matrix.postRotate(angle)
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
     /**
@@ -183,7 +191,10 @@ class MainActivity : AppCompatActivity() {
 //                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
 
         // default tessedit_pageseg_mode assumes a single uniform block of vertically aligned text
-        tessBaseApi?.setVariable("tessedit_pageseg_mode", TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString())
+        tessBaseApi?.setVariable(
+            "tessedit_pageseg_mode",
+            TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString()
+        )
 
         Log.d(TAG, "Training file loaded")
         tessBaseApi?.setImage(bitmap)
