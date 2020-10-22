@@ -35,7 +35,8 @@ class MainActivity : AppCompatActivity() {
 
     // Ml-Kit data variables
     // <image rotation angle, recognized text for the current angle>
-    private var blocks_angles: Map<Int, MutableList<Text.TextBlock>> = mapOf<Int, MutableList<Text.TextBlock>>()
+    private var recognition_results: Map<Int, OcrResultAdapter> = mapOf()
+    private var mlkit_finished_flag = false
     private var image: InputImage? = null
 
     // Tesseract settings
@@ -45,7 +46,7 @@ class MainActivity : AppCompatActivity() {
     private val lang = "fra+eng"
 
     // Tesseract data variables
-    private var tess_result: RecognitionResultAdapter?  = null
+    private var tess_result: OcrResultAdapter?  = null
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,7 +80,8 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun ocrMlkitButtonClickedHandler() {
-        image = readImage()
+
+        prepareDataForOcr(false)
 
         if (null != image) {
             imageView.setImageBitmap(image!!.bitmapInternal)
@@ -93,9 +95,11 @@ class MainActivity : AppCompatActivity() {
 
             // TODO: 19/10/2020 (Anastasia) attention! the function displayRecognitionResult
             // should be called after the TextRecognition is finished for all angles
+
+            displayMlKitRecognitionResult()
             (Handler()).postDelayed(
                 this::displayMlKitRecognitionResult,
-                (sqrt((image!!.width * image!!.height).toDouble()) * angles.size).toLong()
+                (2 * sqrt((image!!.width * image!!.height).toDouble()) * angles.size).toLong()
             )
         }
     }
@@ -106,14 +110,20 @@ class MainActivity : AppCompatActivity() {
             val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
             val recognizer = TextRecognition.getClient()
             val result = recognizer.process(image_rotated)
-                .addOnSuccessListener { visionText ->
-                    var blocks = visionText.textBlocks
+                .addOnSuccessListener { mlkit_result ->
+                    var blocks = mlkit_result.textBlocks
                     blocks = adjustCoordinatesByOriginalAngle(
                         blocks, angle,
                         image_rotated.width, image_rotated.height
                     )
 
-                    blocks_angles += Pair(angle, blocks)
+                    recognition_results += Pair(angle, OcrResultAdapter(blocks))
+
+                    // to know if the processing is finished
+                    // TODO: 22/10/2020 (Anastasia) make it notify the main thread
+                    // or launch the next orientation recognition here
+                    if (recognition_results.size == angles.size)
+                        mlkit_finished_flag = true
                 }
                 .addOnFailureListener { e ->
                     e.printStackTrace()
@@ -126,28 +136,49 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun ocrTesseractButtonClickedHandler() {
-        image = readImage()
+
+        prepareDataForOcr(true)
 
         if (null != image && null != image!!.bitmapInternal) {
             var bitmap = image!!.bitmapInternal
 //            bitmap = rotateBitmap(bitmap!!, 270f)
             imageView.setImageBitmap(bitmap)
 
-            val result = doOcrTesseract(bitmap!!)
+            for (angle in angles) {
+                val result = doOcrTesseract(bitmap!!, angle)
+                if (null != tess_result) {
+                    recognition_results += Pair(0, tess_result!!)
+                    imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
+                }
+
+            }
+
+
 //                tv.text = result
             tv.text = tess_result?.filteredBlockText()
-            imageView.setImageBitmap(tess_result?.getAnnotatedBitmap(imageView.drawable.toBitmap()))
+            imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
+       }
+    }
+
+    private fun prepareDataForOcr(tesseract_flag: Boolean = false) {
+        image = readImage()
+        recognition_results = emptyMap()
+
+        if (tesseract_flag) {
+            prepareTesseract()
+        } else {
+            mlkit_finished_flag = false
         }
     }
 
-    private fun doOcrTesseract(image: Bitmap): String {
-        prepareTesseract()
+    private fun doOcrTesseract(image: Bitmap, angle: Int): String {
+        val image = rotateBitmap(image, angle)
         return startOcrTesseract(image)
     }
 
-    fun rotateBitmap(source: Bitmap, angle: Float): Bitmap? {
+    fun rotateBitmap(source: Bitmap, angle: Int): Bitmap {
         val matrix = Matrix()
-        matrix.postRotate(angle)
+        matrix.postRotate(angle.toFloat())
         return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
@@ -206,7 +237,7 @@ class MainActivity : AppCompatActivity() {
             Log.e(TAG, "Error in recognizing text.")
         }
         tess_result = try {
-            RecognitionResultAdapter(tessBaseApi)
+            OcrResultAdapter(tessBaseApi)
         } catch (e: Exception) {
             Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
@@ -222,25 +253,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun displayMlKitRecognitionResult() {
         tv.text = getTextResultsToDisplayMlKit()
-        imageView.setImageBitmap(getAnnotatedBitmapMlKit())
+        imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
     }
 
-    private fun getAnnotatedBitmapMlKit(): Bitmap? {
+    private fun getAnnotatedBitmap(result_for_orientations: Map<Int, OcrResultAdapter>): Bitmap? {
 
         val workingBitmap: Bitmap? = imageView.drawable.toBitmap()
         val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
-
         //Draw the image bitmap into the cavas
         val canvas = mutableBitmap?.let { Canvas(it) }
 
         val colors = listOf<Int>(Color.RED, Color.BLUE, Color.MAGENTA, Color.CYAN)
-        var angle: Int = 0
-        var blocks:MutableList<Text.TextBlock>? = mutableListOf()
 
         // Get different images orientations
-        for (i in angles.indices) {
-            angle = angles[i]
-            RecognitionResultAdapter(blocks_angles[angle]).drawBoxesOnCanvas(canvas, colors[i])
+        for ((i, result_orientation_i) in result_for_orientations.values.withIndex()) {
+            result_orientation_i.drawBoxesOnCanvas(canvas, colors[i])
         }
 
         return mutableBitmap
@@ -252,8 +279,8 @@ class MainActivity : AppCompatActivity() {
         for (angle in angles) {
             text_to_display += "Orientation $angle: \n"
 
-            var recognition_result_angle = RecognitionResultAdapter(blocks_angles[angle])
-            var angleTexts: String = recognition_result_angle.filteredBlockText()
+            var recognition_result_angle = recognition_results[angle]
+            var angleTexts: String = recognition_result_angle?.filteredBlockText().orEmpty()
 
             if (angleTexts.length > 1)
                 text_to_display += angleTexts

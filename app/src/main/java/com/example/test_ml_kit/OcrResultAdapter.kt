@@ -9,9 +9,10 @@ import java.util.*
 import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
-class RecognitionResultAdapter {
+class OcrResultAdapter {
 
     var text_blocks: MutableList<TextBlock> = ArrayList<TextBlock>()
+    var angle: Int = 0
 
     class TextBlock {
         var block_text: String by Delegates.notNull()
@@ -19,11 +20,11 @@ class RecognitionResultAdapter {
         var text_lines: MutableList<TextBase> = ArrayList<TextBase>()
         var block_confidence: Float? = null
 
-        constructor(mlkit_block: Text.TextBlock) {
+        constructor(mlkit_block: Text.TextBlock, angle: Int = 0) {
             block_text = mlkit_block.text
             block_bounding_box = mlkit_block.boundingBox
             for (line in mlkit_block.lines) {
-                text_lines.add(TextBase(line))
+                text_lines.add(TextBase(line, angle))
             }
         }
 
@@ -59,16 +60,17 @@ class RecognitionResultAdapter {
         var recognized_text: String by Delegates.notNull()
         var bounding_box: Rect? = null
 
-        constructor(mlkit_line:Text.Line) {
+        constructor(mlkit_line:Text.Line, angle: Int = 0) {
             recognized_text = mlkit_line.text
             bounding_box = mlkit_line.boundingBox
         }
     }
 
-    constructor(mlkit_result: MutableList<Text.TextBlock>?) {
+    constructor(mlkit_result: MutableList<Text.TextBlock>?, angle:Int = 0) {
+        this.angle = angle
         if (mlkit_result != null) {
             for (block in mlkit_result) {
-                text_blocks.add(TextBlock(block))
+                text_blocks.add(TextBlock(block, angle))
             }
         }
         this.removeEmptyRecognizedText()
@@ -128,7 +130,7 @@ class RecognitionResultAdapter {
     }
 
     fun drawBoxesOnCanvas(
-        canvas: Canvas?, color: Int) {
+        canvas: Canvas?, color: Int? = null) {
 
         // Line (stroke) options
         var paint = Paint()
@@ -136,7 +138,11 @@ class RecognitionResultAdapter {
         paint.strokeWidth = 2F
         paint.isAntiAlias = true
         paint.textSize = 20F;
-        paint.color = color
+        if (color != null) {
+            paint.color = color
+        } else {
+            paint.color = Color.YELLOW
+        }
 
         if (null != canvas && null != this) {
             for (i in this.text_blocks.indices) {
