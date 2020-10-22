@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val DATA_PATH =
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
-    private val lang = "eng"
+    private val lang = "fra+eng"
 
     // Tesseract data variables
     private var tess_result: RecognitionResultAdapter?  = null
@@ -208,7 +208,7 @@ class MainActivity : AppCompatActivity() {
         tess_result = try {
             RecognitionResultAdapter(tessBaseApi)
         } catch (e: Exception) {
-            Log.e(TAG, "Error in parsing tesseract horc result.")
+            Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
         }
 

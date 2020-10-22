@@ -6,6 +6,7 @@ import com.google.mlkit.vision.text.Text
 import com.googlecode.tesseract.android.TessBaseAPI
 import hocr4j.Page
 import java.util.*
+import kotlin.math.roundToInt
 import kotlin.properties.Delegates
 
 class RecognitionResultAdapter {
@@ -16,6 +17,7 @@ class RecognitionResultAdapter {
         var block_text: String by Delegates.notNull()
         var block_bounding_box: Rect? = null
         var text_lines: MutableList<TextBase> = ArrayList<TextBase>()
+        var block_confidence: Float? = null
 
         constructor(mlkit_block: Text.TextBlock) {
             block_text = mlkit_block.text
@@ -25,16 +27,24 @@ class RecognitionResultAdapter {
             }
         }
 
-        constructor(recognized_text: String, bounding_box: Rect?) {
+        constructor(recognized_text: String, bounding_box: Rect?, block_confidence: Float? = null) {
             this.block_text = recognized_text
             this.block_bounding_box = bounding_box
+            this.block_confidence = block_confidence
         }
 
         fun getFilteredText(use_filter_flag: Boolean): String {
             val line_length_threshold = 2;
 
-            if (!use_filter_flag || this.text_lines.isEmpty())
-                return this.block_text + "\n"
+            if (!use_filter_flag || this.text_lines.isEmpty()) {
+                var block_text_to_display = ""
+                if (null!= this.block_confidence) {
+                    block_text_to_display += "[Block confidence: ${this.block_confidence!!.roundToInt()}] \n"
+                }
+                block_text_to_display += this.block_text + "\n"
+                return block_text_to_display
+            }
+
 
             var filteredText = ""
             for (line in this.text_lines) {
@@ -61,6 +71,7 @@ class RecognitionResultAdapter {
                 text_blocks.add(TextBlock(block))
             }
         }
+        this.removeEmptyRecognizedText()
     }
 
     constructor(tesseract_result: TessBaseAPI?) {
@@ -71,14 +82,17 @@ class RecognitionResultAdapter {
             do {
                 val current_block_text = iterator.getUTF8Text(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
                 val current_block_box = iterator.getBoundingRect(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
-                text_blocks.add(TextBlock(current_block_text,current_block_box))
+                val current_block_confidence = iterator.confidence(TessBaseAPI.PageIteratorLevel.RIL_BLOCK)
+                text_blocks.add(TextBlock(current_block_text,current_block_box,current_block_confidence))
             } while (iterator.next(TessBaseAPI.PageIteratorLevel.RIL_BLOCK))
 
             var hocr = "<body>\n"
             hocr += tesseract_result.getHOCRText(1)
             hocr += "</body>"
             var test = Page.fromHocr(mutableListOf(hocr))
-            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
+//            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
+
+            this.removeEmptyRecognizedText()
         }
     }
 
@@ -132,12 +146,24 @@ class RecognitionResultAdapter {
                     canvas.drawText(
                         "$i",
                         block.block_bounding_box!!.left.toFloat(),
-                        block.block_bounding_box!!.top.toFloat(), paint
+                        block.block_bounding_box!!.top.toFloat() - 4, paint
                     )
                 }
             }
         }
     }
 
-
+    fun removeEmptyRecognizedText() {
+        var indices_to_remove = mutableListOf<Int>()
+        for (i in text_blocks.indices) {
+            val block_text = text_blocks[i].block_text
+            // replace("\\s".toRegex(), "") --> remove all whitespace
+            if (block_text.replace("\\s".toRegex(), "").isEmpty()){
+                indices_to_remove.add(i)
+            }
+        }
+        indices_to_remove.reverse()
+        for (i in indices_to_remove)
+            text_blocks.removeAt(i)
+    }
 }
