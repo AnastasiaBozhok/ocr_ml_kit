@@ -1,10 +1,10 @@
 package com.example.test_ml_kit
 
 import android.graphics.*
+import com.example.test_ml_kit.CoordinatesRotationUtils.Companion.adjustRectCoordinatesByAngle
 import com.google.mlkit.vision.text.Text
 import com.googlecode.tesseract.android.TessBaseAPI
 import hocr4j.Page
-import java.lang.IllegalArgumentException
 import java.util.*
 import kotlin.math.roundToInt
 import kotlin.properties.Delegates
@@ -17,8 +17,10 @@ class OcrResultAdapter {
 
     var text_blocks: MutableList<TextBlock> = ArrayList<TextBlock>()
     var angle: Int = 0
+    var img_width: Int = 0
+    var img_height: Int = 0
 
-    class TextBlock {
+    inner class TextBlock {
         var block_text: String by Delegates.notNull()
         var block_bounding_box: Rect? = null
         var text_lines: MutableList<TextBase> = ArrayList<TextBase>()
@@ -26,7 +28,7 @@ class OcrResultAdapter {
 
         constructor(mlkit_block: Text.TextBlock) {
             block_text = mlkit_block.text
-            block_bounding_box = mlkit_block.boundingBox
+            block_bounding_box = adjustRectCoordinatesByAngle(mlkit_block.boundingBox, angle, img_width, img_height)
             for (line in mlkit_block.lines) {
                 text_lines.add(TextBase(line))
             }
@@ -34,7 +36,7 @@ class OcrResultAdapter {
 
         constructor(recognized_text: String, bounding_box: Rect?, block_confidence: Float? = null) {
             this.block_text = recognized_text
-            this.block_bounding_box = bounding_box
+            this.block_bounding_box = adjustRectCoordinatesByAngle(bounding_box, angle, img_width, img_height)
             this.block_confidence = block_confidence
         }
 
@@ -60,13 +62,13 @@ class OcrResultAdapter {
         }
     }
 
-    open class TextBase {
+    inner class TextBase {
         var recognized_text: String by Delegates.notNull()
         var bounding_box: Rect? = null
 
         constructor(mlkit_line:Text.Line) {
             recognized_text = mlkit_line.text
-            bounding_box = mlkit_line.boundingBox
+            bounding_box = adjustRectCoordinatesByAngle(mlkit_line.boundingBox, angle, img_width, img_height)
         }
     }
 
@@ -74,8 +76,10 @@ class OcrResultAdapter {
     // Constructors from ml-kit and tesseract formats
     // --------------------------------------
 
-    constructor(mlkit_result: MutableList<Text.TextBlock>?, angle:Int? = null) {
+    constructor(mlkit_result: MutableList<Text.TextBlock>?, angle:Int? = null, img_width:Int? = null, img_height:Int? = null) {
         this.angle = if (null == angle) 0 else angle
+        this.img_width = if (null == img_width) 0 else img_width
+        this.img_height = if (null == img_height) 0 else img_height
 
         if (mlkit_result != null) {
             for (block in mlkit_result) {
@@ -85,8 +89,10 @@ class OcrResultAdapter {
         this.removeBlocksWithEmptyText()
     }
 
-    constructor(tesseract_result: TessBaseAPI?, angle:Int? = null) {
+    constructor(tesseract_result: TessBaseAPI?, angle:Int? = null, img_width:Int? = null, img_height:Int? = null) {
         this.angle = if (null == angle) 0 else angle
+        this.img_width = if (null == img_width) 0 else img_width
+        this.img_height = if (null == img_height) 0 else img_height
 
         if (tesseract_result != null) {
             // Iterate through the results.
@@ -193,101 +199,6 @@ class OcrResultAdapter {
                 }
             }
         }
-    }
-
-    // TODO: 22/10/2020 (Anastasia)
-    // 1) Make it more efficient (without corner --> rectangle conversion)
-    // 2) Make it work with all angles (only 0 and 270 now)
-    fun adjustCoordinatesByOriginalAngle(angle: Int, width: Int, height: Int): OcrResultAdapter {
-
-        if (0 != angle) {
-            for (block in this.text_blocks) {
-
-                if (null != block.block_bounding_box) {
-                    var cornerPoints = getCornersFromRectange(block.block_bounding_box!!)
-                    if (null != cornerPoints) {
-                        for (i in 0 until (cornerPoints.size)) {
-                            cornerPoints[i] = rotatePoint(cornerPoints!![i], angle, width, height)
-                        }
-                    }
-
-                    val rec = getRectangleFromCorners(cornerPoints)
-                    block.block_bounding_box!!.left = rec.left
-                    block.block_bounding_box!!.top = rec.top
-                    block.block_bounding_box!!.right = rec.right
-                    block.block_bounding_box!!.bottom = rec.bottom
-
-                }
-            }
-        }
-        return this
-    }
-
-    private fun getCornersFromRectange(rect: Rect): Array<Point> {
-        return arrayOf(
-            Point(rect.left,rect.top),
-            Point(rect.right,rect.top),
-            Point(rect.right,rect.bottom),
-            Point(rect.left,rect.bottom))
-    }
-
-    private fun getRectangleFromCorners(cornerPoints: Array<Point>?): Rect {
-        var rect = Rect(0, 0, 0, 0)
-
-        if (null != cornerPoints) {
-            val left = minOf(cornerPoints[0].x, cornerPoints[1].x, cornerPoints[2].x)
-            val top = minOf(cornerPoints[0].y, cornerPoints[1].y, cornerPoints[2].y)
-            val right = maxOf(cornerPoints[0].x, cornerPoints[1].x, cornerPoints[2].x)
-            val bottom = maxOf(cornerPoints[0].y, cornerPoints[1].y, cornerPoints[2].y)
-
-            rect.left = left
-            rect.top = top
-            rect.right = right
-            rect.bottom = bottom
-        }
-
-        return rect
-    }
-
-    private fun rotateXCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
-
-//        val angle = 360 - angle
-//        val center_x = width / 2
-//        val center_y = height / 2
-//        return round((x - center_x) * cos(angle * Math.PI / 180) -
-//                (height - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
-
-        return if (270 == angle)
-            width - y
-        else
-            throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
-
-    }
-
-    private fun rotateYCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
-        // In an image, downwards is positive Y and rightwards is positive X
-        // https://stackoverflow.com/questions/6428192/get-new-x-y-coordinates-of-a-point-in-a-rotated-image
-
-//        val angle = 360 - angle
-//        val center_x = width / 2
-//        val center_y = height / 2
-//        return round(
-//            -(x - center_x) * sin(angle * Math.PI / 180) -
-//                    (height - y - center_y) * cos(angle * Math.PI / 180) + (height - center_y)
-//        ).toInt()
-
-        return if (270 == angle)
-            x
-        else
-            throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
-
-    }
-
-    private fun rotatePoint(point: Point, angle: Int, width: Int, height: Int): Point {
-        return Point(
-            rotateXCoordinate(point.x, point.y, angle, width, height),
-            rotateYCoordinate(point.x, point.y, angle, width, height)
-        )
     }
 
 }

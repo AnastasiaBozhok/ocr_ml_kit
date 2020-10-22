@@ -25,7 +25,7 @@ import java.util.*
 import kotlin.math.sqrt
 
 
-//tutorial https://developers.google.com/ml-kit/vision/text-recognition/android
+//tutorial ml-kit https://developers.google.com/ml-kit/vision/text-recognition/android
 
 class MainActivity : AppCompatActivity() {
 
@@ -50,6 +50,8 @@ class MainActivity : AppCompatActivity() {
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
     private val lang = "fra+eng"
+    private val engine = TessBaseAPI.OEM_TESSERACT_LSTM_COMBINED
+    private val page_segmentation_mode = TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString()
 
     // --------------------------------
     // Start application and read image
@@ -132,18 +134,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun treatMlkitRecognitionResult(
-        mlkit_result: Text?, angle: Int, width: Int, height: Int
-    ) {
+        mlkit_result: Text?, angle: Int, width: Int, height: Int) {
         if (null != mlkit_result) {
 
-            // Get the result
-            var blocks = mlkit_result.textBlocks
-
             // Transform the result to common format
-            var recognition_result = OcrResultAdapter(blocks)
-
-            // Rotate the boxes coordinates
-            recognition_result = recognition_result.adjustCoordinatesByOriginalAngle(angle, width, height)
+            var recognition_result = OcrResultAdapter(mlkit_result.textBlocks, angle, width, height)
 
             // Save the result in a global variable
             recognition_results += Pair(angle, recognition_result)
@@ -176,10 +171,6 @@ class MainActivity : AppCompatActivity() {
                 var recognition_result = doOcrTesseract(bitmap!!, angle)
                 if (null != recognition_result) {
 
-                    // Rotate the boxes coordinates
-                    recognition_result = recognition_result.adjustCoordinatesByOriginalAngle(
-                        angle, image!!.width, image!!.height)
-
                     // Save the result in a global variable
                     recognition_results += Pair(angle, recognition_result)
                 }
@@ -201,9 +192,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
+     * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
+     *
+     * @param image - original image to analyze
+     * @param angle - image rotation angle
+     */
     private fun doOcrTesseract(image: Bitmap, angle: Int): OcrResultAdapter? {
+        val width_original = image.width
+        val height_original = image.height
         val image = rotateBitmap(image, angle)
-        return startOcrTesseract(image, angle)
+
+        return try {
+            extractTextTesseract(image, angle, width_original, height_original)
+        } catch (e: java.lang.Exception) {
+            Log.e(TAG, e.message!!)
+            null
+        }
     }
 
     fun rotateBitmap(source: Bitmap, angle: Int): Bitmap {
@@ -212,22 +218,7 @@ class MainActivity : AppCompatActivity() {
         return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
-    /**
-     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
-     * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
-     *
-     * @param bitmap
-     */
-    private fun startOcrTesseract(bitmap: Bitmap, angle: Int): OcrResultAdapter? {
-        return try {
-            extractTextTesseract(bitmap, angle)
-        } catch (e: java.lang.Exception) {
-            Log.e(TAG, e.message!!)
-            null
-        }
-    }
-
-    private fun extractTextTesseract(bitmap: Bitmap, angle: Int): OcrResultAdapter? {
+    private fun extractTextTesseract(bitmap: Bitmap, angle: Int, width: Int, height: Int): OcrResultAdapter? {
         var tessBaseApi: TessBaseAPI? = null
         try {
             tessBaseApi = TessBaseAPI()
@@ -240,22 +231,15 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
-        tessBaseApi?.init(DATA_PATH, lang)
 
-//       //EXTRA SETTINGS
-//        //For example if we only want to detect numbers
-//        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_WHITELIST, "1234567890");
-//
-//        //blackList Example
-//        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!@#$%^&*()_+=-qwertyuiop[]}{POIU" +
-//                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
+        // Engine
+        tessBaseApi?.init(DATA_PATH, lang, engine)
 
+        //blackList
+        tessBaseApi?.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!#%^&+=}{'\"\\|~`")
 
         // default tessedit_pageseg_mode assumes a single uniform block of vertically aligned text
-        tessBaseApi?.setVariable(
-            "tessedit_pageseg_mode",
-            TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString()
-        )
+        tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
 
         Log.d(TAG, "Training file loaded")
         tessBaseApi?.setImage(bitmap)
@@ -267,7 +251,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         return try {
-            OcrResultAdapter(tessBaseApi, angle)
+            OcrResultAdapter(tessBaseApi, angle, image!!.width, image!!.height)
         } catch (e: Exception) {
             Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
