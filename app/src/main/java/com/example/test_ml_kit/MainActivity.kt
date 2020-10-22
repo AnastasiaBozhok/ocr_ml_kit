@@ -29,6 +29,10 @@ import kotlin.math.sqrt
 
 class MainActivity : AppCompatActivity() {
 
+    // --------------------------------
+    // Settings and data
+    // --------------------------------
+
     // Ml-Kit settings
 //    private val angles = intArrayOf(0, 90, 180, 270)
     private val angles = intArrayOf(0, 270)
@@ -46,6 +50,10 @@ class MainActivity : AppCompatActivity() {
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
     private val lang = "fra+eng"
+
+    // --------------------------------
+    // Start application and read image
+    // --------------------------------
 
     @RequiresApi(Build.VERSION_CODES.KITKAT)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -88,13 +96,13 @@ class MainActivity : AppCompatActivity() {
             // TODO: 19/10/2020 (Anastasia) attention! there might be a conflict
             // when TextRecognition is called for a new image orientation,
             // but the results of a previous angle are not yet received
+            // make a recursion ?
             for (angle in angles) {
                 recognizeImageMlKit(image!!, angle)
             }
 
             // TODO: 19/10/2020 (Anastasia) attention! the function displayRecognitionResult
             // should be called after the TextRecognition is finished for all angles
-
             displayMlKitRecognitionResult()
             (Handler()).postDelayed(
                 this::displayMlKitRecognitionResult,
@@ -104,29 +112,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun recognizeImageMlKit(image: InputImage, angle: Int) {
-
         if (null != image) {
+
+            // get the image with specified orientation
             val image_rotated = InputImage.fromBitmap(image.bitmapInternal!!, angle)
+
+            // recognize it
             val recognizer = TextRecognition.getClient()
-            val result = recognizer.process(image_rotated)
+            recognizer.process(image_rotated)
                 .addOnSuccessListener { mlkit_result ->
-                    var blocks = mlkit_result.textBlocks
-                    blocks = adjustCoordinatesByOriginalAngle(
-                        blocks, angle,
-                        image_rotated.width, image_rotated.height
-                    )
 
-                    recognition_results += Pair(angle, OcrResultAdapter(blocks))
-
-                    // to know if the processing is finished
-                    // TODO: 22/10/2020 (Anastasia) make it notify the main thread
-                    // or launch the next orientation recognition here
-                    if (recognition_results.size == angles.size)
-                        mlkit_finished_flag = true
+                    // treat the results
+                    treatMlkitRecognitionResult(mlkit_result, angle, image_rotated.width, image_rotated.height)
                 }
                 .addOnFailureListener { e ->
                     e.printStackTrace()
                 }
+        }
+    }
+
+    private fun treatMlkitRecognitionResult(
+        mlkit_result: Text?, angle: Int, width: Int, height: Int
+    ) {
+        if (null != mlkit_result) {
+
+            // Get the result
+            var blocks = mlkit_result.textBlocks
+
+            // Transform the result to common format
+            var recognition_result = OcrResultAdapter(blocks)
+
+            // Rotate the boxes coordinates
+            recognition_result = recognition_result.adjustCoordinatesByOriginalAngle(angle, width, height)
+
+            // Save the result in a global variable
+            recognition_results += Pair(angle, recognition_result)
+
+
+            // TODO: 22/10/2020 (Anastasia) make it notify the main thread
+            // to know if the processing is finished
+            // or launch the next orientation recognition here
+            if (recognition_results.size == angles.size)
+                mlkit_finished_flag = true
         }
     }
 
@@ -144,16 +171,23 @@ class MainActivity : AppCompatActivity() {
             imageView.setImageBitmap(bitmap)
 
             for (angle in angles) {
-                val tess_result = doOcrTesseract(bitmap!!, angle)
-                if (null != tess_result) {
-                    recognition_results += Pair(angle, tess_result!!)
-                    imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
+
+                // Get the result in a common format
+                var recognition_result = doOcrTesseract(bitmap!!, angle)
+                if (null != recognition_result) {
+
+                    // Rotate the boxes coordinates
+                    recognition_result = recognition_result.adjustCoordinatesByOriginalAngle(
+                        angle, image!!.width, image!!.height)
+
+                    // Save the result in a global variable
+                    recognition_results += Pair(angle, recognition_result)
                 }
             }
 
             tv.text = getTextResultsToDisplay()
             imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
-       }
+        }
     }
 
     private fun prepareDataForOcr(tesseract_flag: Boolean = false) {
@@ -169,7 +203,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun doOcrTesseract(image: Bitmap, angle: Int): OcrResultAdapter? {
         val image = rotateBitmap(image, angle)
-        return startOcrTesseract(image)
+        return startOcrTesseract(image, angle)
     }
 
     fun rotateBitmap(source: Bitmap, angle: Int): Bitmap {
@@ -184,16 +218,16 @@ class MainActivity : AppCompatActivity() {
      *
      * @param bitmap
      */
-    private fun startOcrTesseract(bitmap: Bitmap): OcrResultAdapter? {
+    private fun startOcrTesseract(bitmap: Bitmap, angle: Int): OcrResultAdapter? {
         return try {
-            extractTextTesseract(bitmap)
+            extractTextTesseract(bitmap, angle)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, e.message!!)
             null
         }
     }
 
-    private fun extractTextTesseract(bitmap: Bitmap): OcrResultAdapter? {
+    private fun extractTextTesseract(bitmap: Bitmap, angle: Int): OcrResultAdapter? {
         var tessBaseApi: TessBaseAPI? = null
         try {
             tessBaseApi = TessBaseAPI()
@@ -216,6 +250,7 @@ class MainActivity : AppCompatActivity() {
 //        tessBaseApi.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!@#$%^&*()_+=-qwertyuiop[]}{POIU" +
 //                "YTRWQasdASDfghFGHjklJKLl;L:'\"\\|~`xcvXCVbnmBNM,./<>?");
 
+
         // default tessedit_pageseg_mode assumes a single uniform block of vertically aligned text
         tessBaseApi?.setVariable(
             "tessedit_pageseg_mode",
@@ -232,7 +267,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         return try {
-            OcrResultAdapter(tessBaseApi)
+            OcrResultAdapter(tessBaseApi, angle)
         } catch (e: Exception) {
             Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
@@ -283,93 +318,12 @@ class MainActivity : AppCompatActivity() {
         return text_to_display
     }
 
-    private fun adjustCoordinatesByOriginalAngle(
-        blocks: MutableList<Text.TextBlock>, angle: Int, width: Int, height: Int
-    ):
-            MutableList<Text.TextBlock> {
 
-        if (0 != angle) {
-            for (block in blocks) {
-                if (null != block.cornerPoints) {
-                    for (i in 0 until (block.cornerPoints!!.size)) {
-                        block.cornerPoints!![i] = rotatePoint(
-                            block.cornerPoints!![i],
-                            angle,
-                            width,
-                            height
-                        )
-                    }
-                }
-
-                if (null != block.boundingBox) {
-
-                    val rec = getRectangleFromCorners(block.cornerPoints)
-                    block.boundingBox!!.left = rec.left
-                    block.boundingBox!!.top = rec.top
-                    block.boundingBox!!.right = rec.right
-                    block.boundingBox!!.bottom = rec.bottom
-
-                }
-            }
-        }
-        return blocks
-    }
 
     //------------------------------------------
     // Display results (common)
     //------------------------------------------
 
-    private fun getRectangleFromCorners(cornerPoints: Array<Point>?): Rect {
-        var rect = Rect(0, 0, 0, 0)
-
-        if (null != cornerPoints) {
-            val left = minOf(cornerPoints[0].x, cornerPoints[1].x, cornerPoints[2].x)
-            val top = minOf(cornerPoints[0].y, cornerPoints[1].y, cornerPoints[2].y)
-            val right = maxOf(cornerPoints[0].x, cornerPoints[1].x, cornerPoints[2].x)
-            val bottom = maxOf(cornerPoints[0].y, cornerPoints[1].y, cornerPoints[2].y)
-
-            rect.left = left
-            rect.top = top
-            rect.right = right
-            rect.bottom = bottom
-        }
-
-        return rect
-    }
-
-    private fun rotateXCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
-
-//        val angle = 360 - angle
-//        val center_x = width / 2
-//        val center_y = height / 2
-//        return round((x - center_x) * cos(angle * Math.PI / 180) -
-//                (height - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
-
-            return width - y
-
-    }
-
-    private fun rotateYCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
-        // In an image, downwards is positive Y and rightwards is positive X
-        // https://stackoverflow.com/questions/6428192/get-new-x-y-coordinates-of-a-point-in-a-rotated-image
-
-//        val angle = 360 - angle
-//        val center_x = width / 2
-//        val center_y = height / 2
-//        return round(
-//            -(x - center_x) * sin(angle * Math.PI / 180) -
-//                    (height - y - center_y) * cos(angle * Math.PI / 180) + (height - center_y)
-//        ).toInt()
-
-        return x
-    }
-
-    private fun rotatePoint(point: Point, angle: Int, width: Int, height: Int): Point {
-        return Point(
-            rotateXCoordinate(point.x, point.y, angle, width, height),
-            rotateYCoordinate(point.x, point.y, angle, width, height)
-        )
-    }
 
     //------------------------------------------
     // Set up a Tesseract model
