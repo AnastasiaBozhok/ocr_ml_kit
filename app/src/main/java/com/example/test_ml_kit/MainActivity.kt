@@ -49,7 +49,17 @@ class MainActivity : AppCompatActivity() {
     private val TESSDATA = "tessdata"
     private val lang = "fra+eng"
     private val engine = TessBaseAPI.OEM_TESSERACT_LSTM_COMBINED
-    private val page_segmentation_mode = TessBaseAPI.PageSegMode.PSM_AUTO_OSD.toString()
+    private val page_segmentation_mode = TessBaseAPI.PageSegMode.PSM_AUTO_ONLY.toString()
+    // Examples of execution times (excluding model init)
+    // for the file barcodeExampleSmall.png :
+    // OEM_TESSERACT_LSTM_COMBINED + PSM_AUTO --> 1.42s
+    // OEM_TESSERACT_LSTM_COMBINED + PSM_AUTO_OSD --> 1.42s
+    // OEM_TESSERACT_LSTM_COMBINED + PSM_AUTO_ONLY --> 1.42s
+    // OEM_TESSERACT_LSTM_COMBINED + PSM_SPARSE_TEXT_OSD --> 1.92s
+    // OEM_TESSERACT_LSTM_COMBINED + PSM_SPARSE_TEXT --> 1.24s (but results are less accurate)
+    // OEM_TESSERACT_ONLY + PSM_SPARSE_TEXT --> 4.3s
+    // OEM_TESSERACT_ONLY + PSM_AUTO_ONLY --> 5.6s
+    // OEM_LSTM_ONLY + PSM_AUTO_ONLY --> 8.5s
 
     // --------------------------------
     // Start application and read image
@@ -202,14 +212,14 @@ class MainActivity : AppCompatActivity() {
         val image = rotateBitmap(image, angle)
 
         return try {
-            extractTextTesseract(image, angle, width_original, height_original)
+            analyzeImageTesseract(image, angle, width_original, height_original)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, e.message!!)
             null
         }
     }
 
-    private fun extractTextTesseract(bitmap: Bitmap, angle: Int, width: Int, height: Int): OcrResultAdapter? {
+    private fun analyzeImageTesseract(bitmap: Bitmap, angle: Int, width: Int, height: Int): OcrResultAdapter? {
 
         // Set the image to analyze
         tessBaseApi?.setImage(bitmap)
@@ -248,7 +258,7 @@ class MainActivity : AppCompatActivity() {
             // BlackList
             tessBaseApi?.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!#%^&+=}{'\"\\|~`")
             // Page segmentation mode, see [TessBaseAPI.PageSegMode]
-            // default mode assumes a single uniform block of vertically aligned text
+            // default mode assumes a single uniform block of text
             tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
 
             Log.d(TAG, "Training file loaded")
@@ -297,9 +307,8 @@ class MainActivity : AppCompatActivity() {
         return text_to_display
     }
 
-
     //------------------------------------------
-    // Set up a Tesseract model
+    // Copy Tesseract model files to the device
     //------------------------------------------
 
     private fun prepareTesseract() {
