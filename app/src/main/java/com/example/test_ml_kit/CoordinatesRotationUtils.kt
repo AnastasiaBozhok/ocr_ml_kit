@@ -1,7 +1,11 @@
 package com.example.test_ml_kit
 
+import android.content.ContentValues.TAG
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.Point
 import android.graphics.Rect
+import android.util.Log
 import java.lang.IllegalArgumentException
 
 class CoordinatesRotationUtils {
@@ -58,13 +62,15 @@ class CoordinatesRotationUtils {
 //        return round((x - center_x) * cos(angle * Math.PI / 180) -
 //                (height - y - center_y) * sin(angle * Math.PI / 180) + center_x).toInt()
 
-            return if (0 == angle)
+            return if (0 == angle) {
                 x
-            else if (270 == angle)
+            } else if (270 == angle) {
                 width - y
-            else
-                throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
-
+            } else {
+                Log.e(TAG, "rotateXCoordinate: Sorry, this function is properly " +
+                            "implemented only for 270 degree rotation. The coordinate will not be rotated.")
+                x
+            }
         }
 
         fun rotateYCoordinate(x: Int, y: Int, angle: Int, width: Int, height: Int): Int {
@@ -79,13 +85,15 @@ class CoordinatesRotationUtils {
 //                    (height - y - center_y) * cos(angle * Math.PI / 180) + (height - center_y)
 //        ).toInt()
 
-            return if (0 == angle)
+            return if (0 == angle) {
                 y
-            else if (270 == angle)
+            } else if (270 == angle) {
                 x
-            else
-                throw IllegalArgumentException("Sorry, this function is implemented only for 270 degree rotation...")
-
+            } else {
+                Log.e(TAG, "rotateYCoordinate: Sorry, this function is properly " +
+                        "implemented only for 270 degree rotation. The coordinate will not be rotated.")
+                y
+            }
         }
 
         fun rotatePoint(point: Point, angle: Int, width: Int, height: Int): Point {
@@ -93,6 +101,12 @@ class CoordinatesRotationUtils {
                 rotateXCoordinate(point.x, point.y, angle, width, height),
                 rotateYCoordinate(point.x, point.y, angle, width, height)
             )
+        }
+
+        fun rotateBitmap(source: Bitmap, angle: Int): Bitmap {
+            val matrix = Matrix()
+            matrix.postRotate(angle.toFloat())
+            return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
         }
     }
 }
