@@ -36,7 +36,6 @@ dependencies {
 
     // Tesseract model v4
     implementation 'cz.adaptech.android:tesseract4android:2.1.0'
-//    implementation 'com.rmtheis:tess-two:9.0.0'
 
     // Required for hocr4j library code
     implementation group: 'com.google.guava', name: 'guava', version: '23.5-jre'

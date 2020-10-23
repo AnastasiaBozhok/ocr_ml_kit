@@ -2,7 +2,9 @@ package com.example.test_ml_kit
 
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -96,7 +98,6 @@ class MainActivity : AppCompatActivity() {
         recognition_results_mlkit = emptyMap()
 
         if (tesseract_flag) {
-            prepareTesseract()
             initializeTesseractModelIfNull()
         }
     }
@@ -119,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val end = System.nanoTime()
-        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin)*1e-9}")
+        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin) * 1e-9}")
     }
 
     private fun recognizeImageMlKit(image: InputImage, angle_index: Int) {
@@ -139,7 +140,12 @@ class MainActivity : AppCompatActivity() {
                 .addOnSuccessListener { mlkit_result ->
 
                     // treat the current image orientation result
-                    treatMlkitRecognitionResult(mlkit_result, angle, image_rotated.width, image_rotated.height)
+                    treatMlkitRecognitionResult(
+                        mlkit_result,
+                        angle,
+                        image_rotated.width,
+                        image_rotated.height
+                    )
 
                     if (angle_index == orientations_to_treat.lastIndex) {
                         // TextRecognition is finished for all angles
@@ -156,7 +162,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun treatMlkitRecognitionResult(
-        mlkit_result: Text?, angle: Int, width: Int, height: Int) {
+        mlkit_result: Text?, angle: Int, width: Int, height: Int
+    ) {
         if (null != mlkit_result) {
             // Transform the result to a common format
             var recognition_result = OcrResultAdapter(mlkit_result.textBlocks, angle, width, height)
@@ -196,7 +203,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         val end = System.nanoTime()
-        Log.d(TAG, "ocrTesseractButtonClickedHandler Elapsed Time in seconds: ${(end - begin)*1e-9}")
+        Log.d(
+            TAG,
+            "ocrTesseractButtonClickedHandler Elapsed Time in seconds: ${(end - begin) * 1e-9}"
+        )
     }
 
     /**
@@ -230,11 +240,14 @@ class MainActivity : AppCompatActivity() {
             Log.e(TAG, "Error in recognizing text.")
         }
 
-        // Transform the result to a common format
+        // Convert the result to a common format
         return try {
             OcrResultAdapter(tessBaseApi, angle, image!!.width, image!!.height)
         } catch (e: Exception) {
-            Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
+            Log.e(
+                TAG,
+                "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result)."
+            )
             null
         } finally {
             // Frees up recognition results and any stored image data
@@ -244,6 +257,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun initializeTesseractModelIfNull() {
         if (null == tessBaseApi) {
+
+            prepareTesseract()
+
             try {
                 tessBaseApi = TessBaseAPI()
             } catch (e: java.lang.Exception) {
@@ -260,6 +276,16 @@ class MainActivity : AppCompatActivity() {
             // Page segmentation mode, see [TessBaseAPI.PageSegMode]
             // default mode assumes a single uniform block of text
             tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
+
+//            // Disable vertical detection
+//            tessBaseApi?.setVariable("textord_tabfind_vertical_text", "0")
+//            tessBaseApi?.setVariable("textord_tabfind_vertical_horizontal_mix", "0")
+//            tessBaseApi?.setVariable("textord_tabfind_vertical_text_ratio", "0")
+//            tessBaseApi?.setVariable("textord_tabvector_vertical_box_ratio", "0")
+
+            // classify_max_slope 	2.41421 	Slope above which lines are called vertical
+
+
 
             Log.d(TAG, "Training file loaded")
         }
