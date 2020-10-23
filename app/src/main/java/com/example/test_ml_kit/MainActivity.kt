@@ -37,9 +37,11 @@ class MainActivity : AppCompatActivity() {
     private val orientations_to_treat = intArrayOf(0, 270)
 
     // Data variables
-    // <image rotation angle, recognized text for the current angle>
-    private var recognition_results: Map<Int, OcrResultAdapter> = mapOf()
     private var image: InputImage? = null
+    // <image rotation angle, recognized text for the current angle>
+    private var recognition_results_mlkit: Map<Int, OcrResultAdapter> = mapOf()
+    // Tesseract model
+    private var tessBaseApi: TessBaseAPI? = null
 
     // Tesseract settings
     private val DATA_PATH =
@@ -81,10 +83,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun prepareDataForOcr(tesseract_flag: Boolean = false) {
         image = readImage()
-        recognition_results = emptyMap()
+        recognition_results_mlkit = emptyMap()
 
         if (tesseract_flag) {
             prepareTesseract()
+            initializeTesseractModelIfNull()
         }
     }
 
@@ -93,7 +96,6 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun ocrMlkitButtonClickedHandler() {
-
         val begin = System.nanoTime()
 
         prepareDataForOcr(false)
@@ -105,6 +107,9 @@ class MainActivity : AppCompatActivity() {
             // call next orientations and display the results
             recognizeImageMlKit(image!!, 0)
         }
+
+        val end = System.nanoTime()
+        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin)*1e-9}")
     }
 
     private fun recognizeImageMlKit(image: InputImage, angle_index: Int) {
@@ -128,7 +133,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (angle_index == orientations_to_treat.lastIndex) {
                         // TextRecognition is finished for all angles
-                        displayRecognitionResult(recognition_results)
+                        displayRecognitionResult(recognition_results_mlkit)
                     } else {
                         // TextRecognition is called for a new image orientation
                         recognizeImageMlKit(image, angle_index + 1)
@@ -147,7 +152,7 @@ class MainActivity : AppCompatActivity() {
             var recognition_result = OcrResultAdapter(mlkit_result.textBlocks, angle, width, height)
 
             // Save the result in a global variable
-            recognition_results += Pair(angle, recognition_result)
+            recognition_results_mlkit += Pair(angle, recognition_result)
         }
     }
 
@@ -156,12 +161,14 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun ocrTesseractButtonClickedHandler() {
+        val begin = System.nanoTime()
 
         prepareDataForOcr(true)
 
         if (null != image && null != image!!.bitmapInternal) {
+
+            var recognition_results: Map<Int, OcrResultAdapter> = mapOf()
             var bitmap = image!!.bitmapInternal
-//            bitmap = rotateBitmap(bitmap!!, 270f)
             imageView.setImageBitmap(bitmap)
 
             for (angle in orientations_to_treat) {
@@ -170,13 +177,16 @@ class MainActivity : AppCompatActivity() {
                 var recognition_result = doOcrTesseract(bitmap!!, angle)
                 if (null != recognition_result) {
 
-                    // Save the result in a global variable
+                    // Save the result in a local variable
                     recognition_results += Pair(angle, recognition_result)
                 }
             }
 
             displayRecognitionResult(recognition_results)
         }
+
+        val end = System.nanoTime()
+        Log.d(TAG, "ocrTesseractButtonClickedHandler Elapsed Time in seconds: ${(end - begin)*1e-9}")
     }
 
     /**
@@ -200,29 +210,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun extractTextTesseract(bitmap: Bitmap, angle: Int, width: Int, height: Int): OcrResultAdapter? {
-        var tessBaseApi: TessBaseAPI? = null
-        try {
-            tessBaseApi = TessBaseAPI()
-        } catch (e: java.lang.Exception) {
-            Log.e(TAG, e.message!!)
-            if (tessBaseApi == null) {
-                Log.e(
-                    TAG,
-                    "TessBaseAPI is null. TessFactory not returning tess object."
-                )
-            }
-        }
 
-        // Engine
-        tessBaseApi?.init(DATA_PATH, lang, engine)
-
-        //blackList
-        tessBaseApi?.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!#%^&+=}{'\"\\|~`")
-
-        // default tessedit_pageseg_mode assumes a single uniform block of vertically aligned text
-        tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
-
-        Log.d(TAG, "Training file loaded")
+        // Set the image to analyze
         tessBaseApi?.setImage(bitmap)
         try {
             // GetUTF8Text calls Recognize behind the scene
@@ -231,13 +220,38 @@ class MainActivity : AppCompatActivity() {
             Log.e(TAG, "Error in recognizing text.")
         }
 
+        // Transform the result to a common format
         return try {
             OcrResultAdapter(tessBaseApi, angle, image!!.width, image!!.height)
         } catch (e: Exception) {
             Log.e(TAG, "Error in RecognitionResultAdapter from tesseract constructor (probably in parsing tesseract horc result).")
             null
         } finally {
-            tessBaseApi?.end()
+            // Frees up recognition results and any stored image data
+            tessBaseApi?.clear()
+        }
+    }
+
+    private fun initializeTesseractModelIfNull() {
+        if (null == tessBaseApi) {
+            try {
+                tessBaseApi = TessBaseAPI()
+            } catch (e: java.lang.Exception) {
+                Log.e(TAG, e.message)
+                if (tessBaseApi == null) {
+                    Log.e(TAG, "TessBaseAPI is null. TessFactory not returning tess object.")
+                }
+            }
+
+            // Init with specific languages and engine
+            tessBaseApi?.init(DATA_PATH, lang, engine)
+            // BlackList
+            tessBaseApi?.setVariable(TessBaseAPI.VAR_CHAR_BLACKLIST, "!#%^&+=}{'\"\\|~`")
+            // Page segmentation mode, see [TessBaseAPI.PageSegMode]
+            // default mode assumes a single uniform block of vertically aligned text
+            tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
+
+            Log.d(TAG, "Training file loaded")
         }
     }
 
