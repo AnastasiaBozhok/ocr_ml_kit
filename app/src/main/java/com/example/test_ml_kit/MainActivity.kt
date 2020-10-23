@@ -233,12 +233,15 @@ class MainActivity : AppCompatActivity() {
 
         // Set the image to analyze
         tessBaseApi?.setImage(bitmap)
+        val begin = System.nanoTime()
         try {
             // GetUTF8Text calls Recognize behind the scene
             tessBaseApi?.getUTF8Text().orEmpty()
         } catch (e: java.lang.Exception) {
             Log.e(TAG, "Error in recognizing text.")
         }
+        val end = System.nanoTime()
+        Log.d(TAG, "Tesseract recognition, single image. Elapsed Time in seconds: ${(end - begin) * 1e-9}")
 
         // Convert the result to a common format
         return try {
@@ -277,14 +280,19 @@ class MainActivity : AppCompatActivity() {
             // default mode assumes a single uniform block of text
             tessBaseApi?.setVariable("tessedit_pageseg_mode", page_segmentation_mode)
 
-//            // Disable vertical detection
+//            // Disable vertical detection (test)
 //            tessBaseApi?.setVariable("textord_tabfind_vertical_text", "0")
-//            tessBaseApi?.setVariable("textord_tabfind_vertical_horizontal_mix", "0")
+//            tessBaseApi?.setVariable("textord_tabfind_vertical_horizontal_mix", "1")
 //            tessBaseApi?.setVariable("textord_tabfind_vertical_text_ratio", "0")
 //            tessBaseApi?.setVariable("textord_tabvector_vertical_box_ratio", "0")
+//            tessBaseApi?.setVariable("textord_straight_baselines", "1")
+//            tessBaseApi?.setVariable("textord_old_baselines", "0")
+//            tessBaseApi?.setVariable("textord_tabfind_force_vertical_text", "1")
+//            tessBaseApi?.setVariable("textord_fast_pitch_test", "1")
 
             // classify_max_slope 	2.41421 	Slope above which lines are called vertical
-
+            // textord_tabvector_vertical_gap_fraction 	0.5 	max fraction of mean blob width allowed for vertical gaps in vertical text
+            // chop_vertical_creep 	0 	Vertical creep
 
 
             Log.d(TAG, "Training file loaded")
