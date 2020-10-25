@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 /**
  * Utility class containing predicates and comparators for lines.
  *
- * @see io.github.karols.hocr4j.Line
+// * @see io.github.karols.hocr4j.Line
  */
 public final class LineThat {
 
@@ -112,10 +112,10 @@ public final class LineThat {
         public boolean apply(Line input) {
             return input != null && !input.isBlank();
         }
-        @Override
-        public boolean test(@Nullable Line input) {
-            return false;
-        }
+//        @Override
+//        public boolean test(@Nullable Line input) {
+//            return false;
+//        }
     };
 
     /**
@@ -130,10 +130,10 @@ public final class LineThat {
             public boolean apply(Line input) {
                 return input != null && input.mkString().contains(string);
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 
@@ -153,10 +153,10 @@ public final class LineThat {
                 String lowercaseSpacelessLine = line.mkLowercaseSpacelessString(locale);
                 return lowercaseSpacelessLine.contains(lowercaseSpacelessNeedle);
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 
@@ -198,10 +198,10 @@ public final class LineThat {
                 }
                 return false;
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 
@@ -294,10 +294,10 @@ public final class LineThat {
                         && bounds.isBelow(headerBounds)
                         && also.apply(line);
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 
@@ -335,10 +335,10 @@ public final class LineThat {
                         && bounds.isToTheRight(headerBounds)
                         && also.apply(line);
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 
@@ -365,10 +365,10 @@ public final class LineThat {
             public boolean apply(Line input) {
                 return input != null && regex.matcher(input.mkString()).matches();
             }
-            @Override
-            public boolean test(@Nullable Line input) {
-                return false;
-            }
+//            @Override
+//            public boolean test(@Nullable Line input) {
+//                return false;
+//            }
         };
     }
 

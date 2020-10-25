@@ -240,10 +240,10 @@ public class Page extends DelegatingUnmodifiableList<Area> implements Bounded {
                             return input.getBounds().getHeight() > cutoffHeight;
                         }
                     }
-                    @Override
-                    public boolean test(@Nullable Word input) {
-                        return false;
-                    }
+//                    @Override
+//                    public boolean test(@Nullable Word input) {
+//                        return false;
+//                    }
                 };
         final Function<Line, Line> lineCleaner =
                 new Function<Line, Line>() {
