@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
     private val DATA_PATH =
         Environment.getExternalStorageDirectory().toString() + "/tesseract4/best/"
     private val TESSDATA = "tessdata"
-    private val lang = "fra+eng"
+    private val lang = "eng+fra"
     private val engine = TessBaseAPI.OEM_TESSERACT_LSTM_COMBINED
     private val page_segmentation_mode = TessBaseAPI.PageSegMode.PSM_AUTO_ONLY.toString()
     // Examples of execution times (excluding model init)
@@ -266,7 +266,7 @@ class MainActivity : AppCompatActivity() {
             try {
                 tessBaseApi = TessBaseAPI()
             } catch (e: java.lang.Exception) {
-                Log.e(TAG, e.message)
+                e.message?.let { Log.e(TAG, it) }
                 if (tessBaseApi == null) {
                     Log.e(TAG, "TessBaseAPI is null. TessFactory not returning tess object.")
                 }

@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId "com.example.test_ml_kit"
-        minSdkVersion 26
+        minSdkVersion 24
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"
@@ -32,6 +32,8 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+
+    // ML Kit OCR
     implementation 'com.google.android.gms:play-services-mlkit-text-recognition:16.1.1'
 
     // Tesseract model v4

@@ -204,7 +204,7 @@ class OcrResultAdapter {
             for (i in this.text_blocks.indices) {
                 val block = this.text_blocks[i]
                 if (block?.block_bounding_box != null) {
-                    canvas.drawRect(block.block_bounding_box, paint)
+                    canvas.drawRect(block.block_bounding_box!!, paint)
                     canvas.drawText(
                         "${i+1}",
                         block.block_bounding_box!!.left.toFloat(),
