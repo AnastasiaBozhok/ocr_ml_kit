@@ -3,8 +3,6 @@ package com.example.test_ml_kit
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,7 +13,6 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import com.example.test_ml_kit.CoordinatesRotationUtils.Companion.rotateBitmap
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
@@ -41,7 +38,7 @@ class MainActivity : AppCompatActivity() {
     // Data variables
     private var image: InputImage? = null
     // <image rotation angle, recognized text for the current angle>
-    private var recognition_results_mlkit: Map<Int, OcrResultAdapter> = mapOf()
+    private var recognition_results_mlkit = OcrResultsAdapter()
     // Tesseract model
     private var tessBaseApi: TessBaseAPI? = null
 
@@ -62,6 +59,9 @@ class MainActivity : AppCompatActivity() {
     // OEM_TESSERACT_ONLY + PSM_SPARSE_TEXT --> 4.3s
     // OEM_TESSERACT_ONLY + PSM_AUTO_ONLY --> 5.6s
     // OEM_LSTM_ONLY + PSM_AUTO_ONLY --> 8.5s
+
+    // Debug variables
+    private var begin_time_mlkit:Long = 0
 
     // --------------------------------
     // Start application and read image
@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun prepareDataForOcr(tesseract_flag: Boolean = false) {
         image = readImage()
-        recognition_results_mlkit = emptyMap()
+        recognition_results_mlkit.empty()
 
         if (tesseract_flag) {
             initializeTesseractModelIfNull()
@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
     //------------------------------------------
 
     private fun ocrMlkitButtonClickedHandler() {
-        val begin = System.nanoTime()
+        begin_time_mlkit = System.nanoTime()
 
         prepareDataForOcr(false)
 
@@ -118,9 +118,6 @@ class MainActivity : AppCompatActivity() {
             // call next orientations and display the results
             recognizeImageMlKit(image!!, 0)
         }
-
-        val end = System.nanoTime()
-        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin) * 1e-9}")
     }
 
     private fun recognizeImageMlKit(image: InputImage, angle_index: Int) {
@@ -149,7 +146,10 @@ class MainActivity : AppCompatActivity() {
 
                     if (angle_index == orientations_to_treat.lastIndex) {
                         // TextRecognition is finished for all angles
-                        displayRecognitionResult(recognition_results_mlkit)
+                        recognition_results_mlkit.displayRecognitionResult(tv, imageView)
+
+                        val end = System.nanoTime()
+                        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin_time_mlkit) * 1e-9}")
                     } else {
                         // TextRecognition is called for a new image orientation
                         recognizeImageMlKit(image, angle_index + 1)
@@ -169,7 +169,7 @@ class MainActivity : AppCompatActivity() {
             var recognition_result = OcrResultAdapter(mlkit_result.textBlocks, angle, width, height)
 
             // Save the result in a global variable
-            recognition_results_mlkit += Pair(angle, recognition_result)
+            recognition_results_mlkit.addResultForImageOrientation(angle, recognition_result)
         }
     }
 
@@ -184,7 +184,7 @@ class MainActivity : AppCompatActivity() {
 
         if (null != image && null != image!!.bitmapInternal) {
 
-            var recognition_results: Map<Int, OcrResultAdapter> = mapOf()
+            var recognition_results = OcrResultsAdapter()
             var bitmap = image!!.bitmapInternal
             imageView.setImageBitmap(bitmap)
 
@@ -195,11 +195,11 @@ class MainActivity : AppCompatActivity() {
                 if (null != recognition_result) {
 
                     // Save the result in a local variable
-                    recognition_results += Pair(angle, recognition_result)
+                    recognition_results.addResultForImageOrientation(angle, recognition_result)
                 }
             }
 
-            displayRecognitionResult(recognition_results)
+            recognition_results.displayRecognitionResult(tv, imageView)
         }
 
         val end = System.nanoTime()
@@ -297,48 +297,6 @@ class MainActivity : AppCompatActivity() {
 
             Log.d(TAG, "Training file loaded")
         }
-    }
-
-    //------------------------------------------
-    // Display results
-    //------------------------------------------
-
-    private fun displayRecognitionResult(recognition_results: Map<Int, OcrResultAdapter>) {
-        tv.text = getTextResultsToDisplay(recognition_results)
-        imageView.setImageBitmap(getAnnotatedBitmap(recognition_results))
-    }
-
-    private fun getAnnotatedBitmap(recognition_results: Map<Int, OcrResultAdapter>): Bitmap? {
-
-        val workingBitmap: Bitmap? = imageView.drawable.toBitmap()
-        val mutableBitmap = workingBitmap?.copy(Bitmap.Config.ARGB_8888, true)
-        //Draw the image bitmap into the cavas
-        val canvas = mutableBitmap?.let { Canvas(it) }
-
-        val colors = listOf<Int>(Color.RED, Color.BLUE, Color.MAGENTA, Color.CYAN)
-
-        // Get different images orientations
-        for ((i, result_orientation_i) in recognition_results.values.withIndex()) {
-            result_orientation_i.drawBoxesOnCanvas(canvas, colors[i])
-        }
-
-        return mutableBitmap
-    }
-
-    private fun getTextResultsToDisplay(recognition_results: Map<Int, OcrResultAdapter>): String {
-
-        var text_to_display:String = ""
-        for (angle in orientations_to_treat) {
-            text_to_display += "Orientation $angle: \n"
-
-            var recognition_result_angle = recognition_results[angle]
-            var angleTexts: String = recognition_result_angle?.filteredBlockText().orEmpty()
-
-            if (angleTexts.length > 1)
-                text_to_display += angleTexts
-            text_to_display += "\n"
-        }
-        return text_to_display
     }
 
     //------------------------------------------
