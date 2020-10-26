@@ -106,12 +106,15 @@ class OcrResultAdapter {
                 text_blocks.add(TextBlock(current_block_text,current_block_box,current_block_confidence))
             } while (iterator.next(iterator_level))
 
+            // This is a test option !
+            // (converting the results from tesseract to adapter using HOCR format)
             var hocr = "<body>\n"
             hocr += tesseract_result.getHOCRText(1)
             hocr += "</body>"
             var test = Page.fromHocr(mutableListOf(hocr))
 //            Log.i(android.content.ContentValues.TAG, ": ${test.toString()}")
 
+            // Filter the results
             this.removeBlocksWithEmptyText()
             this.removeBlocksWithLowConfidence(50)
         }
