@@ -19,6 +19,7 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.googlecode.tesseract.android.TessBaseAPI
 import kotlinx.android.synthetic.main.activity_main.*
+import org.opencv.android.OpenCVLoader
 import java.io.*
 import java.util.*
 
@@ -73,6 +74,9 @@ class MainActivity : AppCompatActivity() {
         if (!allPermissionsGranted()) {
             getRuntimePermissions()
         }
+
+        /* This will pause the main thread until the OpenCV library is load */
+        OpenCVLoader.initDebug()
 
         setContentView(R.layout.activity_main)
         tv.movementMethod = ScrollingMovementMethod()
@@ -149,7 +153,10 @@ class MainActivity : AppCompatActivity() {
                         recognition_results_mlkit.displayRecognitionResult(tv, imageView)
 
                         val end = System.nanoTime()
-                        Log.d(TAG, "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin_time_mlkit) * 1e-9}")
+                        Log.d(
+                            TAG,
+                            "ocrMlkitButtonClickedHandler Elapsed Time in seconds: ${(end - begin_time_mlkit) * 1e-9}"
+                        )
                     } else {
                         // TextRecognition is called for a new image orientation
                         recognizeImageMlKit(image, angle_index + 1)
@@ -210,7 +217,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * don't run this code in main thread - it stops UI thread. Create AsyncTask instead.
+     * don't run this code in main thread - it pauses UI thread. Create AsyncTask instead.
      * http://developer.android.com/intl/ru/reference/android/os/AsyncTask.html
      *
      * @param image - original image to analyze
@@ -241,7 +248,10 @@ class MainActivity : AppCompatActivity() {
             Log.e(TAG, "Error in recognizing text.")
         }
         val end = System.nanoTime()
-        Log.d(TAG, "Tesseract recognition, single image. Elapsed Time in seconds: ${(end - begin) * 1e-9}")
+        Log.d(
+            TAG,
+            "Tesseract recognition, single image. Elapsed Time in seconds: ${(end - begin) * 1e-9}"
+        )
 
         // Convert the result to a common format
         return try {

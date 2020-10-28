@@ -3,7 +3,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 28
+    compileSdkVersion 29
     buildToolsVersion "30.0.2"
 
     defaultConfig {
@@ -42,4 +42,7 @@ dependencies {
     // Required for hocr4j library code
     implementation 'com.google.guava:guava:23.2-android'
     implementation 'org.apache.commons:commons-text:1.6'
+
+    // Open CV
+    implementation project(path: ':openCVLibrary450')
 }
