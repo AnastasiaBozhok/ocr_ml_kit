@@ -160,14 +160,16 @@ class MainActivity : AppCompatActivity() {
     private fun prepareDataForOcr(tesseract_flag: Boolean = false) {
         image = readImage()
 
-        // TODO: 28/10/2020 (Anastasia)
-        // The code below should be called asynchronously !!!
-        image = ImagePretreatment.pretreatImage(image)
+        if (null != image) {
+            // TODO: 28/10/2020 (Anastasia)
+            // The code below should be called asynchronously !!!
+            image = ImagePretreatment.pretreatImage(image)
 
-        recognition_results_mlkit.empty()
+            recognition_results_mlkit.empty()
 
-        if (tesseract_flag) {
-            initializeTesseractModelIfNull()
+            if (tesseract_flag) {
+                initializeTesseractModelIfNull()
+            }
         }
     }
 

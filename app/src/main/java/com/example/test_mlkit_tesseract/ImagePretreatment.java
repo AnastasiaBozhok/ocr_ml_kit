@@ -46,30 +46,35 @@ public class ImagePretreatment {
     @RequiresApi(api = Build.VERSION_CODES.N)
     public static InputImage pretreatImage(InputImage im)  {
 
-        System.out.println("Started");
+        if (null != im) {
+            System.out.println("Started");
 
-        // Creating the output directories
-        String dir = Environment.getExternalStorageDirectory().toString();
-        new File(outputFolder).mkdirs();
-        new File(debugFolder).mkdirs();
+            // Creating the output directories
+            String dir = Environment.getExternalStorageDirectory().toString();
+            new File(outputFolder).mkdirs();
+            new File(debugFolder).mkdirs();
 
-        // convert InputImage to Bitmap and Mat
-        Bitmap bmp = im.getBitmapInternal();
-        Mat image = getMatFromBitmap(bmp);
+            // convert InputImage to Bitmap and Mat
+            Bitmap bmp = im.getBitmapInternal();
 
-        // Straight it out
-        Mat straightImage = straightenImage(image);
+            if (null != bmp) {
+                Mat image = getMatFromBitmap(bmp);
 
-        // Write the results
-        Imgcodecs.imwrite(outputFolder + "result.jpg", straightImage);
+                // Straight it out
+                Mat straightImage = straightenImage(image);
 
-        System.out.println("Finished");
+                // Write the results
+                Imgcodecs.imwrite(outputFolder + "result.jpg", straightImage);
 
-        // convert Mat back to Bitmap and InputImage
+                // convert Mat back to Bitmap and InputImage
+                Bitmap bmp_out = Bitmap.createBitmap(straightImage.width(),straightImage.height(), Bitmap.Config.ARGB_8888);
+                Utils.matToBitmap(straightImage, bmp_out);
 
-        Bitmap bmp_out = Bitmap.createBitmap(straightImage.width(),straightImage.height(), Bitmap.Config.ARGB_8888);
-        Utils.matToBitmap(straightImage, bmp_out);
-        return InputImage.fromBitmap(bmp_out, 0);
+                System.out.println("Finished");
+                return InputImage.fromBitmap(bmp_out, 0);
+            }
+        }
+        return null;
     }
 
     private static Mat getMatFromBitmap(Bitmap bmp) {
