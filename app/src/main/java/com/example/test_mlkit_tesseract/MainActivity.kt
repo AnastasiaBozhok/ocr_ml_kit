@@ -293,19 +293,17 @@ class MainActivity : AppCompatActivity() {
      * @param angle - image rotation angle
      */
     private fun doOcrTesseract(image: Bitmap, angle: Int): OcrResultAdapter? {
-        val width_original = image.width
-        val height_original = image.height
         val image = rotateBitmap(image, angle)
 
         return try {
-            analyzeImageTesseract(image, angle, width_original, height_original)
+            analyzeImageTesseract(image, angle)
         } catch (e: java.lang.Exception) {
             Log.e(TAG, e.message!!)
             null
         }
     }
 
-    private fun analyzeImageTesseract(bitmap: Bitmap, angle: Int, width: Int, height: Int): OcrResultAdapter? {
+    private fun analyzeImageTesseract(bitmap: Bitmap, angle: Int): OcrResultAdapter? {
 
         // Set the image to analyze
         tessBaseApi?.setImage(bitmap)
