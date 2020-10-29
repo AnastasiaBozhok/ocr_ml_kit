@@ -1,0 +1,2 @@
+ninja: Entering directory `C:\Users\Anastasia\Projects\IA\ocr_ml_kit\opencv\.cxx\cmake\debug\x86'
+ninja: no work to do.

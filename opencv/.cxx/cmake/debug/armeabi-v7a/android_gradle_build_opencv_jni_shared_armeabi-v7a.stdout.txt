@@ -1,0 +1,2 @@
+ninja: Entering directory `C:\Users\Anastasia\Projects\IA\ocr_ml_kit\opencv\.cxx\cmake\debug\armeabi-v7a'
+ninja: no work to do.

@@ -1,0 +1,3 @@
+C:/Users/Anastasia/Projects/IA/ocr_ml_kit/opencv/.cxx/cmake/release/arm64-v8a/CMakeFiles/opencv_jni_shared.dir
+C:/Users/Anastasia/Projects/IA/ocr_ml_kit/opencv/.cxx/cmake/release/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/Anastasia/Projects/IA/ocr_ml_kit/opencv/.cxx/cmake/release/arm64-v8a/CMakeFiles/rebuild_cache.dir
